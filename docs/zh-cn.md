@@ -1,14 +1,14 @@
 # Nic
 
-English | [中文](https://github.com/EddieIvan01/nic/tree/master/docs/zh-cn.md)
+[English](https://github.com/EddieIvan01/nic/blob/master/README.md) | 中文
 
-Nic is a HTTP request library designed to send a HTTP request easier
+Nic是一个HTTP请求库，能让HTTP请求的发送变得更简单
 
 ***
 
-### Installation
+### 安装
 
-To install nic, enter the following command
+输入下面的命令来安装Nic
 
 ```
 $ go get -v -u github.com/eddieivan01/nic
@@ -16,9 +16,9 @@ $ go get -v -u github.com/eddieivan01/nic
 
 ***
 
-### Quick start
+### 快速开始
 
-Do a HTTP request like this
+像这样发送一个HTTP请求
 
 ```go
 resp, err := nic.Get("http://example.com", nil)
@@ -30,11 +30,11 @@ fmt.Println(resp.Text)
 
 ***
 
-### Documentation
+### 文档
 
-**do a basic request**
+**发起一个基本的请求**
 
-nic could do these methods' request
+nic可以发送以下方法的请求
 
 `"HEAD", "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH", "CONNECT", "TRACE"`
 
@@ -54,7 +54,7 @@ func main() {
 }
 ```
 
-**post request with some data**
+**带data的post请求**
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -67,7 +67,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**request with cookies**
+**带cookies的请求**
 
 ```go
 resp, err := nic.Get(url, &nic.H{
@@ -77,7 +77,7 @@ resp, err := nic.Get(url, &nic.H{
 })
 ```
 
-**request with files**
+**带文件的请求**
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -91,7 +91,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**request with JSON**
+**带JSON的请求**
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -101,7 +101,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**request with unencoded message**
+**发送未经编码的原生数据**
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -109,7 +109,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**all the parameters**
+**所有的参数**
 
 ```go
 H struct {
@@ -127,13 +127,13 @@ H struct {
 }
 ```
 
-**NOTICE!!!**
+**注意!!!**
 
-`nic.H` can only have one of the following four parameters
+`nic.H` 只能带有以下四种参数的一个
 
 `H.Raw, H.Data, H.Files, H.JSON`
 
-**request with session, which could save server's`set-cookie` header**
+**用session发起请求，session可以保存服务器的`set-cookie`选项设置的cookie**
 
 ```go
 session := &nic.Session{}
@@ -149,7 +149,7 @@ resp, err := session.Post("http://example.com/login", nic.H{
 resp, err = session.Get("http://example.com/userinfo", nil)
 ```
 
-**handle response**
+**处理响应**
 
 ```go
 resp, _ := nic.Get(url, nil)
@@ -157,7 +157,7 @@ fmt.Println(resp.Text)
 fmt.Println(resp.Bytes)
 ```
 
-**handle JSON response**
+**处理JSON响应**
 
 ```go
 resp, _ := nil.Get(url, nil)
@@ -175,9 +175,9 @@ if err == nil {
 }
 ```
 
-**change response's encoding**
+**改变响应的编码**
 
-`SetEncode` will convert `resp.Bytes` to `resp.Text` if encoding is changed every time be called 
+`SetEncode` 函数每一次调用都会把`resp.Bytes`转换到`resp.Text`如果编码改变了的话
 
 ```go
 resp, _ := nil.Get(url, nil)
