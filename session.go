@@ -33,7 +33,14 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 	switch method {
 	case "HEAD", "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH",
 		"CONNECT", "TRACE":
-		s.request, _ = http.NewRequest(method, urlStr, nil)
+		// urlencode the query string
+		urlStrParsed, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, err
+		}
+		urlStrParsed.RawQuery = urlStrParsed.Query().Encode()
+
+		s.request, _ = http.NewRequest(method, urlStrParsed.String(), nil)
 		s.request.Header.Set("User-Agent", userAgent)
 
 		// https://stackoverflow.com/questions/17714494/golang-http-request-results-in-eof-errors-when-making-multiple-requests-successi
@@ -43,7 +50,7 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 			s.request.AddCookie(cookie)
 		}
 		// add options of Request struct
-		err := addOptions(s.request, options)
+		err = addOptions(s.request, options)
 		if err != nil {
 			return nil, err
 		}
