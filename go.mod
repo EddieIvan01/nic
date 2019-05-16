@@ -1,4 +1,4 @@
-module nic
+module github.com/eddieivan01/nic
 
 go 1.12
 
