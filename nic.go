@@ -6,7 +6,7 @@ import (
 
 const (
 	version   = "0.1.0"
-	userAgent = "nic-http-client/0.1"
+	userAgent = "golang-nic/0.1"
 	author    = "Iv4n"
 	copyright = "Copyright 2019 Iv4n"
 )
