@@ -162,7 +162,7 @@ func TestSessionKeeping(t *testing.T) {
 	session := &Session{}
 
 	resp, _ := session.Request("get", baseURL+"/cookie", nil)
-	cookies := session.cookies
+	cookies := session.Cookies
 	if len(cookies) == 0 || len(resp.Cookies()) == 0 {
 		t.Error("session keep error")
 	}

@@ -1,8 +1,18 @@
 # Nic
 
+![GitHub release](https://img.shields.io/github/release/eddieivan01/nic.svg?label=nic)![GitHub issues](https://img.shields.io/github/issues/eddieivan01/nic.svg)
+
 [English](https://github.com/EddieIvan01/nic/blob/master/README.md) | 中文
 
-Nic是一个HTTP请求库，能让HTTP请求的发送变得更简单
+Nic是一个拥有优雅易用的API的HTTP请求库
+
+***
+
+### 特性
+
++ 封装了HTTP标准库，提供了优雅易用的API
++ 通过`nic.Session`来保持session
++ 线程（go-routine）安全
 
 ***
 
@@ -32,7 +42,7 @@ fmt.Println(resp.Text)
 
 ### 文档
 
-**发起一个基本的请求**
+#### 发起一个基本的请求
 
 nic可以发送以下方法的请求
 
@@ -54,7 +64,7 @@ func main() {
 }
 ```
 
-**带data的post请求**
+#### 带data的post请求
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -67,7 +77,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**带cookies的请求**
+#### 带cookies的请求
 
 ```go
 resp, err := nic.Get(url, &nic.H{
@@ -77,7 +87,7 @@ resp, err := nic.Get(url, &nic.H{
 })
 ```
 
-**带文件的请求**
+#### 带文件的请求
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -91,7 +101,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**带JSON的请求**
+#### 带JSON的请求
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -101,7 +111,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**发送未经编码的原生数据**
+#### 发送未经编码的原生数据
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -109,7 +119,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**所有的参数**
+#### 所有的参数
 
 ```go
 H struct {
@@ -127,13 +137,13 @@ H struct {
 }
 ```
 
-**注意!!!**
+#### 注意!!!
 
 `nic.H` 只能带有以下四种参数的一个
 
 `H.Raw, H.Data, H.Files, H.JSON`
 
-**用session发起请求，session可以保存服务器的`set-cookie`选项设置的cookie**
+#### 用session发起请求，session可以保存服务器的`set-cookie`选项设置的cookie
 
 ```go
 session := &nic.Session{}
@@ -149,7 +159,7 @@ resp, err := session.Post("http://example.com/login", nic.H{
 resp, err = session.Get("http://example.com/userinfo", nil)
 ```
 
-**处理响应**
+#### 处理响应
 
 ```go
 resp, _ := nic.Get(url, nil)
@@ -157,7 +167,7 @@ fmt.Println(resp.Text)
 fmt.Println(resp.Bytes)
 ```
 
-**处理JSON响应**
+#### 处理JSON响应
 
 ```go
 resp, _ := nil.Get(url, nil)
@@ -175,9 +185,9 @@ if err == nil {
 }
 ```
 
-**改变响应的编码**
+#### 改变响应的编码
 
-`SetEncode` 函数每一次调用都会把`resp.Bytes`转换到`resp.Text`如果编码改变了的话
+如果编码改变了的话，`SetEncode` 函数每一次调用都会把`resp.Bytes`转换到`resp.Text`
 
 ```go
 resp, _ := nil.Get(url, nil)

@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	version   = "0.1.0"
-	userAgent = "golang-nic/0.1"
+	version   = "0.1.1"
+	userAgent = "golang-nic/0.1.1"
 	author    = "Iv4n"
 	copyright = "Copyright 2019 Iv4n"
 )
@@ -14,24 +14,24 @@ const (
 var (
 	// ErrInvalidMethod will be throwed when method not in
 	// [HEAD, GET, POST, DELETE, OPTIONS, PUT, PATCH, CONNECT, TRACE]
-	ErrInvalidMethod = errors.New("Method is invalid")
+	ErrInvalidMethod = errors.New("nic: Method is invalid")
 
 	// ErrFileInfo will be throwed when fileinfo is invalid
-	ErrFileInfo = errors.New("Invalid file information")
+	ErrFileInfo = errors.New("nic: Invalid file information")
 
 	// ErrParamConflict will be throwed when options params conflict
 	// e.g. files + data
 	//      json + data
 	//      ...
-	ErrParamConflict = errors.New("Options param conflict")
+	ErrParamConflict = errors.New("nic: Options param conflict")
 
 	// ErrUnrecognizedEncoding will be throwed while changing response encoding
 	// if encoding is not recognized
-	ErrUnrecognizedEncoding = errors.New("Unrecognized encoding")
+	ErrUnrecognizedEncoding = errors.New("nic: Unrecognized encoding")
 
 	// ErrNotJsonResponse will be throwed when response not a json
 	// but invoke Json() method
-	ErrNotJsonResponse = errors.New("Not a Json response")
+	ErrNotJsonResponse = errors.New("nic: Not a Json response")
 )
 
 // Get implemented by Session.Get

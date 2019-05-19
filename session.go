@@ -1,6 +1,7 @@
 package nic
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -10,11 +11,11 @@ import (
 type (
 	// Session is the wrapper for http.Client and http.Request
 	Session struct {
-		client  *http.Client
+		Client  *http.Client
 		request *http.Request
-		cookies []*http.Cookie
+		Cookies []*http.Cookie
 
-		// default to false
+		// default to true
 		allowRedirect bool
 		// default to 0
 		timeout int64
@@ -22,14 +23,25 @@ type (
 )
 
 var (
+	// disable automatic redirect
 	disableRedirect = func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
+	}
+
+	// from HTTP std lib
+	// automatic redirection allowed 10 times
+	defaultCheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return nil
 	}
 )
 
 // Request is the base method
 func (s *Session) Request(method string, urlStr string, options *H) (*Response, error) {
 	method = strings.ToUpper(method)
+
 	switch method {
 	case "HEAD", "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH",
 		"CONNECT", "TRACE":
@@ -43,12 +55,14 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 		s.request, _ = http.NewRequest(method, urlStrParsed.String(), nil)
 		s.request.Header.Set("User-Agent", userAgent)
 
+		// using one session multiply
 		// https://stackoverflow.com/questions/17714494/golang-http-request-results-in-eof-errors-when-making-multiple-requests-successi
 		s.request.Close = true
-		s.client = &http.Client{}
-		for _, cookie := range s.cookies {
+		s.Client = &http.Client{}
+		for _, cookie := range s.Cookies {
 			s.request.AddCookie(cookie)
 		}
+
 		// add options of Request struct
 		err = addOptions(s.request, options)
 		if err != nil {
@@ -57,12 +71,10 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 
 		// add options of Client struct
 		if options != nil {
-			// allowRedirect and timeout hould be restored to the default value
-			// after every request
 			if !options.AllowRedirect {
-				s.client.CheckRedirect = disableRedirect
+				s.Client.CheckRedirect = disableRedirect
 			}
-			s.client.Timeout = time.Duration(options.Timeout) * time.Second
+			s.Client.Timeout = time.Duration(options.Timeout) * time.Second
 
 			if options.Proxy != "" {
 				urli := url.URL{}
@@ -70,7 +82,7 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 				if err != nil {
 					return nil, err
 				}
-				s.client.Transport = &http.Transport{
+				s.Client.Transport = &http.Transport{
 					Proxy: http.ProxyURL(urlproxy),
 				}
 			}
@@ -80,7 +92,8 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 		return nil, ErrInvalidMethod
 	}
 
-	resp, err := s.client.Do(s.request)
+	// do request and parse response
+	resp, err := s.Client.Do(s.request)
 	if err != nil {
 		return nil, err
 	}
@@ -97,15 +110,23 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 	}
 	retResp.text()
 
-	s.client.CheckRedirect = disableRedirect
-	s.client.Timeout = 0
-	s.cookies = append(s.cookies, resp.Cookies()...)
+	// allowRedirect and timeout will be restored to the default value after every request
+	s.Client.CheckRedirect = defaultCheckRedirect
+	s.Client.Timeout = 0
+
+	// store cookies in the session structure
+	s.Cookies = append(s.Cookies, resp.Cookies()...)
 	return retResp, nil
 }
 
 // ClearCookies deletes all cookies
 func (s *Session) ClearCookies() {
-	s.cookies = []*http.Cookie{}
+	s.Cookies = []*http.Cookie{}
+}
+
+// GetRequest returns nic.Session.request
+func (s *Session) GetRequest() *http.Request {
+	return s.request
 }
 
 // Get is a shortcut for get method

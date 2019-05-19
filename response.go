@@ -1,7 +1,9 @@
 package nic
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -22,8 +24,11 @@ func (r *Response) text() {
 }
 
 func (r *Response) bytes() error {
-	bytes, err := ioutil.ReadAll(r.Body)
-	r.Bytes = bytes
+	data, err := ioutil.ReadAll(r.Body)
+	// for multiple reading
+	// e.g. goquery.NewDocumentFromReader
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	r.Bytes = data
 	return err
 }
 
@@ -59,4 +64,15 @@ func (r *Response) SetEncode(e string) error {
 // GetEncode returns Response.encoding
 func (r *Response) GetEncode() string {
 	return r.encoding
+}
+
+func (r *Response) Read(x []byte) (int, error) {
+	fmt.Println(len(x), cap(x))
+	fmt.Println(len(r.Bytes), cap(r.Bytes))
+	fmt.Println(r.Bytes[4095])
+	for i := 0; i < len(x) && i < len(r.Bytes); i++ {
+		//fmt.Println(i)
+		x[i] = r.Bytes[i]
+	}
+	return len(r.Bytes), nil
 }

@@ -1,8 +1,19 @@
 # Nic
 
+![GitHub release](https://img.shields.io/github/release/eddieivan01/nic.svg?label=nic)![GitHub issues](https://img.shields.io/github/issues/eddieivan01/nic.svg)
+
 English | [中文](https://github.com/EddieIvan01/nic/tree/master/docs/zh-cn.md)
 
-Nic is a HTTP request library designed to send a HTTP request easier
+Nic is a HTTP request client which has elegant, easy-to-use API
+
+***
+
+### Features
+
++ wrapper of HTTP std lib, provids elegant and easy-to-use API
+
++ keep session via `nic.Session` structure
++ thread(go-routine) safe
 
 ***
 
@@ -32,7 +43,7 @@ fmt.Println(resp.Text)
 
 ### Documentation
 
-**do a basic request**
+#### do a basic request
 
 nic could do these methods' request
 
@@ -54,7 +65,7 @@ func main() {
 }
 ```
 
-**post request with some data**
+#### post request with some data
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -67,7 +78,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**request with cookies**
+#### request with cookies
 
 ```go
 resp, err := nic.Get(url, &nic.H{
@@ -77,7 +88,7 @@ resp, err := nic.Get(url, &nic.H{
 })
 ```
 
-**request with files**
+#### request with files
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -91,7 +102,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**request with JSON**
+#### request with JSON
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -101,7 +112,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**request with unencoded message**
+#### request with unencoded message
 
 ```go
 resp, err := nic.Post(url, &nic.H{
@@ -109,7 +120,7 @@ resp, err := nic.Post(url, &nic.H{
 })
 ```
 
-**all the parameters**
+#### all the parameters
 
 ```go
 H struct {
@@ -127,13 +138,13 @@ H struct {
 }
 ```
 
-**NOTICE!!!**
+#### NOTICE!!!
 
 `nic.H` can only have one of the following four parameters
 
 `H.Raw, H.Data, H.Files, H.JSON`
 
-**request with session, which could save server's`set-cookie` header**
+#### request with session, which could save server's`set-cookie` header
 
 ```go
 session := &nic.Session{}
@@ -149,7 +160,7 @@ resp, err := session.Post("http://example.com/login", nic.H{
 resp, err = session.Get("http://example.com/userinfo", nil)
 ```
 
-**handle response**
+#### handle response
 
 ```go
 resp, _ := nic.Get(url, nil)
@@ -157,7 +168,7 @@ fmt.Println(resp.Text)
 fmt.Println(resp.Bytes)
 ```
 
-**handle JSON response**
+#### handle JSON response
 
 ```go
 resp, _ := nil.Get(url, nil)
@@ -175,7 +186,7 @@ if err == nil {
 }
 ```
 
-**change response's encoding**
+#### change response's encoding
 
 `SetEncode` will convert `resp.Bytes` to `resp.Text` if encoding is changed every time be called 
 
@@ -188,3 +199,30 @@ if err == nil {
 }
 ```
 
+***
+
+### QA
+
++ Q:
+
+  How to get origin `*http.Request` from `nic.Session`?
+
+  A:
+
+  by `nic.Session.GetRequest` method
+
++ Q:
+
+  How to pass origin `*http.Response` to goquery-like-DOM libs from `nic.Response`?
+
+  A:
+
+  use `resp.Response` to access origin anonymous structure `*http.Response`; and `(*http.Response).Body's IO.Reader` has been saved, you can  use `*http.Response` as if it were the original structure
+
++ Q:
+
+  Redirection is allowed 10 times by default, how could I increase the number?
+
+  A:
+
+  by access `nic.Session.Client` then change its CheckRedirect property
