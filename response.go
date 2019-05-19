@@ -65,14 +65,3 @@ func (r *Response) SetEncode(e string) error {
 func (r *Response) GetEncode() string {
 	return r.encoding
 }
-
-func (r *Response) Read(x []byte) (int, error) {
-	fmt.Println(len(x), cap(x))
-	fmt.Println(len(r.Bytes), cap(r.Bytes))
-	fmt.Println(r.Bytes[4095])
-	for i := 0; i < len(x) && i < len(r.Bytes); i++ {
-		//fmt.Println(i)
-		x[i] = r.Bytes[i]
-	}
-	return len(r.Bytes), nil
-}
