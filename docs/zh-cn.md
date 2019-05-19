@@ -1,6 +1,6 @@
 # Nic
 
-![GitHub release](https://img.shields.io/github/release/eddieivan01/nic.svg?label=nic)![GitHub issues](https://img.shields.io/github/issues/eddieivan01/nic.svg)
+![GitHub release](https://img.shields.io/github/release/eddieivan01/nic.svg?label=nic)  ![GitHub issues](https://img.shields.io/github/issues/eddieivan01/nic.svg)
 
 [English](https://github.com/EddieIvan01/nic/blob/master/README.md) | 中文
 
@@ -198,3 +198,30 @@ if err == nil {
 }
 ```
 
+***
+
+### QA
+
++ Q:
+
+  如何从`nic.Session`中获得原始的`*http.Request`?
+
+  A:
+
+  通过 `nic.Session.GetRequest` 方法
+
++ Q:
+
+  如何通过 `nic.Response`将原始的 `*http.Response` 传递给类似于goquery的DOM解析库?
+
+  A:
+
+  通过`resp, _ := nic.Get(...); resp.Response` 来访问原始的匿名结构体字段`*http.Response`; 而且nic中`(*http.Response).Body's IO.Reader` 的bytes被拷贝了, 你可以像使用原始的 `*http.Response` 一样来使用它
+
++ Q:
+
+  默认只允许十次重定向，我如何增加这个次数?
+
+  A:
+
+  通过访问 `nic.Session.Client` 然后修改它的CheckRedirect属性

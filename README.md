@@ -1,6 +1,6 @@
 # Nic
 
-![GitHub release](https://img.shields.io/github/release/eddieivan01/nic.svg?label=nic)![GitHub issues](https://img.shields.io/github/issues/eddieivan01/nic.svg)
+![GitHub release](https://img.shields.io/github/release/eddieivan01/nic.svg?label=nic)  ![GitHub issues](https://img.shields.io/github/issues/eddieivan01/nic.svg)
 
 English | [中文](https://github.com/EddieIvan01/nic/tree/master/docs/zh-cn.md)
 
@@ -213,11 +213,11 @@ if err == nil {
 
 + Q:
 
-  How to pass origin `*http.Response` to goquery-like-DOM libs from `nic.Response`?
+  How to pass origin `*http.Response` to goquery-like DOM-parsing-libs from `nic.Response`?
 
   A:
 
-  use `resp.Response` to access origin anonymous structure `*http.Response`; and `(*http.Response).Body's IO.Reader` has been saved, you can  use `*http.Response` as if it were the original structure
+  use `resp, _ := nic.Get(...); resp.Response` to access origin anonymous structure `*http.Response`; and `(*http.Response).Body's IO.Reader` has been saved, you can  use `*http.Response` as if it were the original structure
 
 + Q:
 
