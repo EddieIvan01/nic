@@ -31,7 +31,7 @@ type (
 	}
 
 	// KV is used for H struct
-	KV map[string]string
+	KV map[string]interface{}
 
 	// F is for file-upload request
 	// map[string]KV{
@@ -67,24 +67,38 @@ func (h *H) isConflict() bool {
 // functions for adding options
 // vvvvvvvvvvvvvvvvvvvvv
 //========================================================
-func addData(req *http.Request, d KV) {
+func addData(req *http.Request, d KV) error {
 	data := ""
 	for k, v := range d {
 		k = url.QueryEscape(k)
+
+		v, ok := v.(string)
+		if !ok {
+			return fmt.Errorf("nic: %v param must be string type", v)
+		}
 		v = url.QueryEscape(v)
 		data = fmt.Sprintf("%s&%s=%s", data, k, v)
 	}
+
 	data = data[1:]
 	req.Body = ioutil.NopCloser(strings.NewReader(data))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return nil
 }
 
 func addFiles(req *http.Request, f F) error {
 	for name, fileInfo := range f {
-		filename := fileInfo["filename"]
+		filenameI := fileInfo["filename"]
+
+		filename, ok := filenameI.(string)
+		if !ok {
+			return fmt.Errorf("nic: filename %v must be string type", filenameI)
+		}
+
 		if len(fileInfo) < 1 || filename == "" {
 			return ErrFileInfo
 		}
+
 		fp, err := os.Open(filename)
 		if err != nil {
 			return err
@@ -97,6 +111,7 @@ func addFiles(req *http.Request, f F) error {
 		if err != nil {
 			return err
 		}
+
 		_, err = io.Copy(part, fp)
 		if err != nil {
 			return err
@@ -105,6 +120,10 @@ func addFiles(req *http.Request, f F) error {
 		if len(fileInfo) > 1 {
 			delete(fileInfo, "filename")
 			for k, v := range fileInfo {
+				v, ok := v.(string)
+				if !ok {
+					return fmt.Errorf("nic: %v param must be string type", v)
+				}
 				_ = writer.WriteField(k, v)
 			}
 		}
@@ -155,6 +174,10 @@ func addOptions(req *http.Request, h *H) error {
 
 	if h.Headers != nil {
 		for headerK, headerV := range h.Headers {
+			headerV, ok := headerV.(string)
+			if !ok {
+				return fmt.Errorf("nic: header %v must be string type", headerV)
+			}
 			req.Header.Add(headerK, headerV)
 		}
 	}
@@ -162,6 +185,10 @@ func addOptions(req *http.Request, h *H) error {
 	if h.Cookies != nil {
 		req.Header.Set("Cookies", "")
 		for cookieK, cookieV := range h.Cookies {
+			cookieV, ok := cookieV.(string)
+			if !ok {
+				return fmt.Errorf("nic: cookie %v must be string type", cookieV)
+			}
 			c := &http.Cookie{
 				Name:  cookieK,
 				Value: cookieV,
@@ -172,6 +199,10 @@ func addOptions(req *http.Request, h *H) error {
 
 	if h.Auth != nil {
 		for k, v := range h.Auth {
+			v, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("nic: basic-auth %v must be string type", v)
+			}
 			req.SetBasicAuth(k, v)
 		}
 	}
