@@ -75,15 +75,3 @@ func Patch(url string, options *H) (*Response, error) {
 	session := &Session{}
 	return session.Patch(url, options)
 }
-
-// Connect implemented by Session.Connect
-func Connect(url string, options *H) (*Response, error) {
-	session := &Session{}
-	return session.Connect(url, options)
-}
-
-// Trace implemented by Session.Trace
-func Trace(url string, options *H) (*Response, error) {
-	session := &Session{}
-	return session.Trace(url, options)
-}

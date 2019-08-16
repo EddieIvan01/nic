@@ -43,8 +43,7 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 	method = strings.ToUpper(method)
 
 	switch method {
-	case "HEAD", "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH",
-		"CONNECT", "TRACE":
+	case "HEAD", "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH":
 		// urlencode the query string
 		urlStrParsed, err := url.Parse(urlStr)
 		if err != nil {
@@ -56,7 +55,6 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 		s.request.Header.Set("User-Agent", userAgent)
 
 		// using one session multiply
-		// https://stackoverflow.com/questions/17714494/golang-http-request-results-in-eof-errors-when-making-multiple-requests-successi
 		s.request.Close = true
 		s.Client = &http.Client{}
 		for _, cookie := range s.Cookies {
@@ -162,14 +160,4 @@ func (s *Session) Put(url string, options *H) (*Response, error) {
 // Patch is a shortcut for get method
 func (s *Session) Patch(url string, options *H) (*Response, error) {
 	return s.Request("patch", url, options)
-}
-
-// Connect is a shortcut for get method
-func (s *Session) Connect(url string, options *H) (*Response, error) {
-	return s.Request("connect", url, options)
-}
-
-// Trace is a shortcut for get method
-func (s *Session) Trace(url string, options *H) (*Response, error) {
-	return s.Request("trace", url, options)
 }
