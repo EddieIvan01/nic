@@ -18,6 +18,22 @@ type Response struct {
 	Bytes    []byte
 }
 
+func NewResponse(r *http.Response) (*Response, error) {
+	resp := &Response{
+		Response: r,
+		encoding: "utf-8",
+		Text:     "",
+		Bytes:    []byte{},
+	}
+
+	err := resp.bytes()
+	if err != nil {
+		return nil, err
+	}
+	resp.text()
+	return resp, nil
+}
+
 func (r *Response) text() {
 	r.Text = string(r.Bytes)
 }
@@ -33,7 +49,7 @@ func (r *Response) bytes() error {
 
 // JSON could parse http json response
 // if is not a json response, returns ErrNotJsonResponse
-func (r *Response) JSON(s interface{}) error {
+func (r Response) JSON(s interface{}) error {
 	// JSON response not must be `application/json` type
 	// maybe `text/plain`, `text/html`...etc.
 	/*
@@ -61,6 +77,6 @@ func (r *Response) SetEncode(e string) error {
 }
 
 // GetEncode returns Response.encoding
-func (r *Response) GetEncode() string {
+func (r Response) GetEncode() string {
 	return r.encoding
 }

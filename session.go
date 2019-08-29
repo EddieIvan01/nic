@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 type (
@@ -38,8 +37,13 @@ var (
 	}
 )
 
+// NewSession returns an empty Session
+func NewSession() *Session {
+	return &Session{}
+}
+
 // Request is the base method
-func (s *Session) Request(method string, urlStr string, options *H) (*Response, error) {
+func (s *Session) Request(method string, urlStr string, option Option) (*Response, error) {
 	method = strings.ToUpper(method)
 
 	switch method {
@@ -51,39 +55,35 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 		}
 		urlStrParsed.RawQuery = urlStrParsed.Query().Encode()
 
-		s.request, _ = http.NewRequest(method, urlStrParsed.String(), nil)
+		s.request, err = http.NewRequest(method, urlStrParsed.String(), nil)
+		if err != nil {
+			return nil, err
+		}
 		s.request.Header.Set("User-Agent", userAgent)
-
-		// using one session multiply
 		s.request.Close = true
-		s.Client = &http.Client{}
+
 		for _, cookie := range s.Cookies {
 			s.request.AddCookie(cookie)
 		}
 
-		// add options of Request struct
-		err = addOptions(s.request, options)
+		// set options of http.Request
+		if option != nil {
+			err = option.setRequestOpt(s.request)
+		}
 		if err != nil {
 			return nil, err
 		}
 
-		// add options of Client struct
-		if options != nil {
-			if !options.AllowRedirect {
-				s.Client.CheckRedirect = disableRedirect
-			}
-			s.Client.Timeout = time.Duration(options.Timeout) * time.Second
+		if s.Client == nil {
+			s.Client = &http.Client{}
+		}
 
-			if options.Proxy != "" {
-				urli := url.URL{}
-				urlproxy, err := urli.Parse(options.Proxy)
-				if err != nil {
-					return nil, err
-				}
-				s.Client.Transport = &http.Transport{
-					Proxy: http.ProxyURL(urlproxy),
-				}
-			}
+		// set options of http.Client
+		if option != nil {
+			err = option.setClientOpt(s.Client)
+		}
+		if err != nil {
+			return nil, err
 		}
 
 	default:
@@ -91,22 +91,14 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 	}
 
 	// do request and parse response
-	resp, err := s.Client.Do(s.request)
+	r, err := s.Client.Do(s.request)
 	if err != nil {
 		return nil, err
 	}
-
-	retResp := &Response{
-		resp,
-		"utf-8",
-		"",
-		[]byte{},
-	}
-	err = retResp.bytes()
+	resp, err := NewResponse(r)
 	if err != nil {
 		return nil, err
 	}
-	retResp.text()
 
 	// allowRedirect and timeout will be restored to the default value after every request
 	s.Client.CheckRedirect = defaultCheckRedirect
@@ -114,7 +106,7 @@ func (s *Session) Request(method string, urlStr string, options *H) (*Response, 
 
 	// store cookies in the session structure
 	s.Cookies = append(s.Cookies, resp.Cookies()...)
-	return retResp, nil
+	return resp, nil
 }
 
 // ClearCookies deletes all cookies
@@ -128,36 +120,36 @@ func (s *Session) GetRequest() *http.Request {
 }
 
 // Get is a shortcut for get method
-func (s *Session) Get(url string, options *H) (*Response, error) {
-	return s.Request("get", url, options)
+func (s *Session) Get(url string, option Option) (*Response, error) {
+	return s.Request("get", url, option)
 }
 
 // Post is a shortcut for get method
-func (s *Session) Post(url string, options *H) (*Response, error) {
-	return s.Request("post", url, options)
+func (s *Session) Post(url string, option Option) (*Response, error) {
+	return s.Request("post", url, option)
 }
 
 // Head is a shortcut for get method
-func (s *Session) Head(url string, options *H) (*Response, error) {
-	return s.Request("head", url, options)
+func (s *Session) Head(url string, option Option) (*Response, error) {
+	return s.Request("head", url, option)
 }
 
 // Delete is a shortcut for get method
-func (s *Session) Delete(url string, options *H) (*Response, error) {
-	return s.Request("delete", url, options)
+func (s *Session) Delete(url string, option Option) (*Response, error) {
+	return s.Request("delete", url, option)
 }
 
 // Options is a shortcut for get method
-func (s *Session) Options(url string, options *H) (*Response, error) {
-	return s.Request("options", url, options)
+func (s *Session) Options(url string, option Option) (*Response, error) {
+	return s.Request("options", url, option)
 }
 
 // Put is a shortcut for get method
-func (s *Session) Put(url string, options *H) (*Response, error) {
-	return s.Request("put", url, options)
+func (s *Session) Put(url string, option Option) (*Response, error) {
+	return s.Request("put", url, option)
 }
 
 // Patch is a shortcut for get method
-func (s *Session) Patch(url string, options *H) (*Response, error) {
-	return s.Request("patch", url, options)
+func (s *Session) Patch(url string, option Option) (*Response, error) {
+	return s.Request("patch", url, option)
 }

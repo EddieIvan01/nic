@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	version   = "0.1.1"
-	userAgent = "golang-nic/0.1.1"
+	version   = "0.2.0"
+	userAgent = "golang-nic/0.2.0"
 	author    = "Iv4n"
 	copyright = "Copyright 2019 Iv4n"
 )
@@ -35,43 +35,43 @@ var (
 )
 
 // Get implemented by Session.Get
-func Get(url string, options *H) (*Response, error) {
+func Get(url string, option Option) (*Response, error) {
 	session := &Session{}
-	return session.Get(url, options)
+	return session.Get(url, option)
 }
 
 // Post implemented by Session.Post
-func Post(url string, options *H) (*Response, error) {
+func Post(url string, option Option) (*Response, error) {
 	session := &Session{}
-	return session.Post(url, options)
+	return session.Post(url, option)
 }
 
 // Head implemented by Session.Head
-func Head(url string, options *H) (*Response, error) {
+func Head(url string, option Option) (*Response, error) {
 	session := &Session{}
-	return session.Head(url, options)
+	return session.Head(url, option)
 }
 
 // Delete implemented by Session.Delete
-func Delete(url string, options *H) (*Response, error) {
+func Delete(url string, option Option) (*Response, error) {
 	session := &Session{}
-	return session.Delete(url, options)
+	return session.Delete(url, option)
 }
 
 // Options implemented by Session.Options
-func Options(url string, options *H) (*Response, error) {
+func Options(url string, option Option) (*Response, error) {
 	session := &Session{}
-	return session.Options(url, options)
+	return session.Options(url, option)
 }
 
 // Put implemented by Session.Put
-func Put(url string, options *H) (*Response, error) {
+func Put(url string, option Option) (*Response, error) {
 	session := &Session{}
-	return session.Put(url, options)
+	return session.Put(url, option)
 }
 
 // Patch implemented by Session.Patch
-func Patch(url string, options *H) (*Response, error) {
+func Patch(url string, option Option) (*Response, error) {
 	session := &Session{}
-	return session.Patch(url, options)
+	return session.Patch(url, option)
 }

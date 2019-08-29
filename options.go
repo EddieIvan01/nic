@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type (
@@ -45,8 +46,14 @@ type (
 	F map[string]KV
 )
 
+// Option is the interface implemented by `H` and `*H`
+type Option interface {
+	setRequestOpt(*http.Request) error
+	setClientOpt(*http.Client) error
+}
+
 // could only contains one of Data, Raw, Files, Json
-func (h *H) isConflict() bool {
+func (h H) isConflict() bool {
 	count := 0
 	if h.Data != nil {
 		count++
@@ -63,11 +70,7 @@ func (h *H) isConflict() bool {
 	return count > 1
 }
 
-//========================================================
-// functions for adding options
-// vvvvvvvvvvvvvvvvvvvvv
-//========================================================
-func addData(req *http.Request, d KV) error {
+func setData(req *http.Request, d KV) error {
 	data := ""
 	for k, v := range d {
 		k = url.QueryEscape(k)
@@ -86,7 +89,7 @@ func addData(req *http.Request, d KV) error {
 	return nil
 }
 
-func addFiles(req *http.Request, f F) error {
+func setFiles(req *http.Request, f F) error {
 	for name, fileInfo := range f {
 		filenameI := fileInfo["filename"]
 
@@ -139,7 +142,7 @@ func addFiles(req *http.Request, f F) error {
 	return nil
 }
 
-func addJSON(req *http.Request, j KV) error {
+func setJSON(req *http.Request, j KV) error {
 	jsonV, err := json.Marshal(j)
 	if err != nil {
 		return err
@@ -149,26 +152,18 @@ func addJSON(req *http.Request, j KV) error {
 	return nil
 }
 
-//========================================================
-// ^^^^^^^^^^^^^^^^^^^^^
-// functions for adding options
-//========================================================
-
-func addOptions(req *http.Request, h *H) error {
-	// add option to request
+func (h H) setRequestOpt(req *http.Request) error {
+	// set option to request
 	// data, header, cookie, auth, file, json
-	if h == nil {
-		return nil
-	}
 	if h.isConflict() {
 		return ErrParamConflict
 	}
 
 	if h.Data != nil {
-		err := addData(req, h.Data)
-        if err != nil {
-            return err
-        }
+		err := setData(req, h.Data)
+		if err != nil {
+			return err
+		}
 	}
 
 	if h.Raw != "" {
@@ -211,18 +206,38 @@ func addOptions(req *http.Request, h *H) error {
 	}
 
 	if h.Files != nil {
-		err := addFiles(req, h.Files)
+		err := setFiles(req, h.Files)
 		if err != nil {
 			return err
 		}
 	}
 
 	if h.JSON != nil {
-		err := addJSON(req, h.JSON)
+		err := setJSON(req, h.JSON)
 		if err != nil {
 			return err
 		}
 	}
 
+	return nil
+}
+
+func (h H) setClientOpt(client *http.Client) error {
+	if !h.AllowRedirect {
+		client.CheckRedirect = disableRedirect
+	}
+
+	client.Timeout = time.Duration(h.Timeout) * time.Second
+
+	if h.Proxy != "" {
+		urli := url.URL{}
+		urlproxy, err := urli.Parse(h.Proxy)
+		if err != nil {
+			return err
+		}
+		client.Transport = &http.Transport{
+			Proxy: http.ProxyURL(urlproxy),
+		}
+	}
 	return nil
 }
