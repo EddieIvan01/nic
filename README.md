@@ -68,7 +68,7 @@ func main() {
 #### post request with some data
 
 ```go
-resp, err := nic.Post(url, &nic.H{
+resp, err := nic.Post(url, nic.H{
     Data : nic.KV{
         "nic" : "nic",
     },
@@ -81,7 +81,7 @@ resp, err := nic.Post(url, &nic.H{
 #### request with cookies
 
 ```go
-resp, err := nic.Get(url, &nic.H{
+resp, err := nic.Get(url, nic.H{
     Cookies : nic.KV{
         "cookie1" : "nic",
     },
@@ -91,7 +91,7 @@ resp, err := nic.Get(url, &nic.H{
 #### request with files
 
 ```go
-resp, err := nic.Post(url, &nic.H{
+resp, err := nic.Post(url, nic.H{
     Files : nic.F{
         "file" : nic.KV{
             // path of file, filename will be `nic.go`
@@ -105,7 +105,7 @@ resp, err := nic.Post(url, &nic.H{
 #### request with JSON
 
 ```go
-resp, err := nic.Post(url, &nic.H{
+resp, err := nic.Post(url, nic.H{
     JSON : nic.KV{
         "nic" : "nic",
     }
@@ -115,7 +115,7 @@ resp, err := nic.Post(url, &nic.H{
 #### request with unencoded message
 
 ```go
-resp, err := nic.Post(url, &nic.H{
+resp, err := nic.Post(url, nic.H{
     Raw : "post body which is unencoded",
 })
 ```
@@ -124,21 +124,23 @@ resp, err := nic.Post(url, &nic.H{
 
 ```go
 H struct {
+    Data    KV
+    Raw     string
+    Headers KV
+    Cookies KV
+    Auth    KV
+    Proxy   string
+
     AllowRedirect bool
     Timeout       int64
-    Data          KV
-    Raw           string
-    Headers       KV
-    Cookies       KV
-    Auth          KV
-    Proxy         string
+    Chunked       bool
 
     JSON  KV
     Files F
 }
 ```
 
-#### NOTICE!!!
+#### NOTICE
 
 `nic.H` can only have one of the following four parameters
 
@@ -226,3 +228,11 @@ if err == nil {
   A:
 
   by access `nic.Session.Client` then change its CheckRedirect property
+
++ Q:
+
+  How to use the chunked transfer-encoding?
+
+  A:
+
+  by nic.H{Chunked: true}

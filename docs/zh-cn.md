@@ -67,7 +67,7 @@ func main() {
 #### 带data的post请求
 
 ```go
-resp, err := nic.Post(url, &nic.H{
+resp, err := nic.Post(url, nic.H{
     Data : nic.KV{
         "nic" : "nic",
     },
@@ -80,7 +80,7 @@ resp, err := nic.Post(url, &nic.H{
 #### 带cookies的请求
 
 ```go
-resp, err := nic.Get(url, &nic.H{
+resp, err := nic.Get(url, nic.H{
     Cookies : nic.KV{
         "cookie1" : "nic",
     },
@@ -90,7 +90,7 @@ resp, err := nic.Get(url, &nic.H{
 #### 带文件的请求
 
 ```go
-resp, err := nic.Post(url, &nic.H{
+resp, err := nic.Post(url, nic.H{
     Files : nic.F{
         "file" : nic.KV{
             // path of file, filename will be `nic.go`
@@ -104,7 +104,7 @@ resp, err := nic.Post(url, &nic.H{
 #### 带JSON的请求
 
 ```go
-resp, err := nic.Post(url, &nic.H{
+resp, err := nic.Post(url, nic.H{
     JSON : nic.KV{
         "nic" : "nic",
     }
@@ -114,7 +114,7 @@ resp, err := nic.Post(url, &nic.H{
 #### 发送未经编码的原生数据
 
 ```go
-resp, err := nic.Post(url, &nic.H{
+resp, err := nic.Post(url, nic.H{
     Raw : "post body which is unencoded",
 })
 ```
@@ -123,14 +123,16 @@ resp, err := nic.Post(url, &nic.H{
 
 ```go
 H struct {
+    Data    KV
+    Raw     string
+    Headers KV
+    Cookies KV
+    Auth    KV
+    Proxy   string
+
     AllowRedirect bool
     Timeout       int64
-    Data          KV
-    Raw           string
-    Headers       KV
-    Cookies       KV
-    Auth          KV
-    Proxy         string
+    Chunked       bool
 
     JSON  KV
     Files F
@@ -225,3 +227,11 @@ if err == nil {
   A:
 
   通过访问 `nic.Session.Client` 然后修改它的CheckRedirect属性
+
++ Q:
+
+  如何使用chunked传输编码
+
+  A:
+
+  通过设置nic.H{Chunked: true}

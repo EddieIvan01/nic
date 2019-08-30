@@ -18,14 +18,16 @@ import (
 type (
 	// H struct is options for request and http client
 	H struct {
+		Data    KV
+		Raw     string
+		Headers KV
+		Cookies KV
+		Auth    KV
+		Proxy   string
+
 		AllowRedirect bool
 		Timeout       int64
-		Data          KV
-		Raw           string
-		Headers       KV
-		Cookies       KV
-		Auth          KV
-		Proxy         string
+		Chunked       bool
 
 		JSON  KV
 		Files F
@@ -70,7 +72,7 @@ func (h H) isConflict() bool {
 	return count > 1
 }
 
-func setData(req *http.Request, d KV) error {
+func setData(req *http.Request, d KV, chunked bool) error {
 	data := ""
 	for k, v := range d {
 		k = url.QueryEscape(k)
@@ -84,12 +86,20 @@ func setData(req *http.Request, d KV) error {
 	}
 
 	data = data[1:]
-	req.Body = ioutil.NopCloser(strings.NewReader(data))
+	v := strings.NewReader(data)
+	req.Body = ioutil.NopCloser(v)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if !chunked {
+		req.ContentLength = int64(v.Len())
+	}
+
 	return nil
 }
 
-func setFiles(req *http.Request, f F) error {
+func setFiles(req *http.Request, f F, chunked bool) error {
+	buffer := &bytes.Buffer{}
+	writer := multipart.NewWriter(buffer)
+
 	for name, fileInfo := range f {
 		filenameI := fileInfo["filename"]
 
@@ -108,8 +118,6 @@ func setFiles(req *http.Request, f F) error {
 		}
 		defer fp.Close()
 
-		buffer := &bytes.Buffer{}
-		writer := multipart.NewWriter(buffer)
 		part, err := writer.CreateFormFile(name, filepath.Base(filename))
 		if err != nil {
 			return err
@@ -130,25 +138,33 @@ func setFiles(req *http.Request, f F) error {
 				_ = writer.WriteField(k, vs)
 			}
 		}
-		err = writer.Close()
-		if err != nil {
-			return err
-		}
+	}
+	err := writer.Close()
+	if err != nil {
+		return err
+	}
 
-		req.Body = ioutil.NopCloser(buffer)
-		contentType := writer.FormDataContentType()
-		req.Header.Set("Content-Type", contentType)
+	req.Body = ioutil.NopCloser(buffer)
+	contentType := writer.FormDataContentType()
+	req.Header.Set("Content-Type", contentType)
+	if !chunked {
+		req.ContentLength = int64(buffer.Len())
 	}
 	return nil
 }
 
-func setJSON(req *http.Request, j KV) error {
+func setJSON(req *http.Request, j KV, chunked bool) error {
 	jsonV, err := json.Marshal(j)
 	if err != nil {
 		return err
 	}
-	req.Body = ioutil.NopCloser(bytes.NewBuffer(jsonV))
+
+	v := bytes.NewBuffer(jsonV)
+	req.Body = ioutil.NopCloser(v)
 	req.Header.Set("Content-Type", "application/json")
+	if !chunked {
+		req.ContentLength = int64(v.Len())
+	}
 	return nil
 }
 
@@ -160,14 +176,18 @@ func (h H) setRequestOpt(req *http.Request) error {
 	}
 
 	if h.Data != nil {
-		err := setData(req, h.Data)
+		err := setData(req, h.Data, h.Chunked)
 		if err != nil {
 			return err
 		}
 	}
 
 	if h.Raw != "" {
-		req.Body = ioutil.NopCloser(strings.NewReader(h.Raw))
+		v := strings.NewReader(h.Raw)
+		req.Body = ioutil.NopCloser(v)
+		if !h.Chunked {
+			req.ContentLength = int64(v.Len())
+		}
 	}
 
 	if h.Headers != nil {
@@ -206,14 +226,14 @@ func (h H) setRequestOpt(req *http.Request) error {
 	}
 
 	if h.Files != nil {
-		err := setFiles(req, h.Files)
+		err := setFiles(req, h.Files, h.Chunked)
 		if err != nil {
 			return err
 		}
 	}
 
 	if h.JSON != nil {
-		err := setJSON(req, h.JSON)
+		err := setJSON(req, h.JSON, h.Chunked)
 		if err != nil {
 			return err
 		}
