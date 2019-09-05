@@ -69,9 +69,9 @@ func (s *Session) Request(method string, urlStr string, option Option) (*Respons
 		// set options of http.Request
 		if option != nil {
 			err = option.setRequestOpt(s.request)
-		}
-		if err != nil {
-			return nil, err
+            if err != nil {
+			    return nil, err
+		    }
 		}
 
 		if s.Client == nil {
@@ -81,11 +81,10 @@ func (s *Session) Request(method string, urlStr string, option Option) (*Respons
 		// set options of http.Client
 		if option != nil {
 			err = option.setClientOpt(s.Client)
+            if err != nil {
+			    return nil, err
+		    }
 		}
-		if err != nil {
-			return nil, err
-		}
-
 	default:
 		return nil, ErrInvalidMethod
 	}
