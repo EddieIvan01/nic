@@ -67,7 +67,8 @@ func init() {
 	})
 	router.POST("/file", func(c *gin.Context) {
 		file, _ := c.FormFile("file1")
-		if file.Filename == "nic.go" {
+		file2, _ := c.FormFile("file2")
+		if file.Filename == "nic.go" && file2.Filename == "nic" {
 			c.String(200, "file upload ok")
 		} else {
 			c.String(200, "file upload error")
@@ -193,11 +194,10 @@ func TestPostMethodWithFiles(t *testing.T) {
 	session := &Session{}
 
 	resp, err := session.Request("post", baseURL+"/file", &H{
-		Files: F{
-			"file1": KV{
-				"filename": `.\nic.go`,
-				"token":    "123",
-			},
+		Files: KV{
+			"file1": File("nic.go", []byte("package main")),
+			"file2": FileFromPath("nic.go").MIME("text/html").FName("nic"),
+			"token": "123",
 		},
 	})
 	if err != nil || resp.Text == "file upload error" {

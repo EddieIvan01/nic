@@ -1,3 +1,9 @@
+## Nic 0.2.1
+
++ add file handling method: nic.Response.SaveFile
+
++ change file uploading's API, now we can change file's MIME type and filename field
+
 ## Nic 0.2.0
 
 + refactor code

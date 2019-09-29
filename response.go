@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/axgle/mahonia"
@@ -79,4 +80,19 @@ func (r *Response) SetEncode(e string) error {
 // GetEncode returns Response.encoding
 func (r Response) GetEncode() string {
 	return r.encoding
+}
+
+// SaveFile save bytes data to a local file
+func (r Response) SaveFile(filename string) error {
+	dst, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	_, err = dst.Write(r.Bytes)
+	if err != nil {
+		return err
+	}
+	return nil
 }

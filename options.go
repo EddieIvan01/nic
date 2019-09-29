@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -30,23 +31,89 @@ type (
 		Chunked       bool
 
 		JSON  KV
-		Files F
+		Files KV
 	}
 
 	// KV is used for H struct
 	KV map[string]interface{}
 
-	// F is for file-upload request
-	// map[string]KV{
-	//     "file1" : KV{
-	//                  // path of file
-	//                  "filename" : "1.txt",
-	//                  "token" : "abc",
-	//               },
-	//     "file2" : KV{...},
+	// when upload a file, we use nic.KV again
+	// nic.File returns F struct
+	//
+	// map[string]interface{} {
+	//     "file1" :"file" : nic.FileFromPath("test.go"),
+	//     "file2" : nic.File("test.go", []byte("package nic")).
+	// 					FName("nic.go").
+	//					MIME("text/plain"),
+	//     "token" : "abc",
 	// }
-	F map[string]KV
+	//
+	//
+	// the POST body is:
+	//
+	// Content-Type: multipart/form-data; boundary=e7d105eae032bdc774a787f1d874269d04499cb284477d6d77889be73caf
+	// Accept-Encoding: gzip
+	//
+	// --e7d105eae032bdc774a787f1d874269d04499cb284477d6d77889be73caf
+	// Content-Disposition: form-data; name="file1"; filename="test.go"
+	// Content-Type: application/octet-stream
+	//
+	// package test
+	// --e7d105eae032bdc774a787f1d874269d04499cb284477d6d77889be73caf
+	// Content-Disposition: form-data; name="token"
+	//
+	// abc
+	// --e7d105eae032bdc774a787f1d874269d04499cb284477d6d77889be73caf
+	// Content-Disposition: form-data; name="file2"; filename="nic.go"
+	// Content-Type: text/plain
+	//
+	// package test
+	// --e7d105eae032bdc774a787f1d874269d04499cb284477d6d77889be73caf--
+	//
+	// F struct saves file form information
+	F struct {
+		Src      []byte
+		FilePath string
+		FileName string
+		MimeType string
+	}
 )
+
+// File returns a new file struct
+func File(filename string, src []byte) *F {
+	return &F{
+		Src:      src,
+		FileName: filename,
+	}
+}
+
+// FileFromPath returns a file struct from file path
+func FileFromPath(path string) *F {
+	return &F{
+		FilePath: path,
+		FileName: filepath.Base(path),
+	}
+}
+
+// FName changes file's filename in multipart form
+// invoke it in a chain
+func (f *F) FName(filename string) *F {
+	f.FileName = filename
+	return f
+}
+
+// MIME changes file's mime type in multipart form
+// invoke it in a chain
+func (f *F) MIME(mimetype string) *F {
+	f.MimeType = mimetype
+	return f
+}
+
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+func escapeQuotes(s string) string {
+	return quoteEscaper.Replace(s)
+}
 
 // Option is the interface implemented by `H` and `*H`
 type Option interface {
@@ -79,7 +146,8 @@ func setData(req *http.Request, d KV, chunked bool) error {
 
 		vs, ok := v.(string)
 		if !ok {
-			return fmt.Errorf("nic: post data %v[%T] must be string type", v, v)
+			return fmt.Errorf(
+				"nic: post data %v[%T] must be string type", v, v)
 		}
 		vs = url.QueryEscape(vs)
 		data = fmt.Sprintf("%s&%s=%s", data, k, vs)
@@ -96,49 +164,58 @@ func setData(req *http.Request, d KV, chunked bool) error {
 	return nil
 }
 
-func setFiles(req *http.Request, f F, chunked bool) error {
+func setFiles(req *http.Request, files KV, chunked bool) error {
 	buffer := &bytes.Buffer{}
 	writer := multipart.NewWriter(buffer)
 
-	for name, fileInfo := range f {
-		filenameI := fileInfo["filename"]
+	for name, value := range files {
+		switch value := value.(type) {
+		case *F:
+			mimetype := value.MimeType
+			if mimetype == "" {
+				mimetype = "application/octet-stream"
+			}
 
-		filename, ok := filenameI.(string)
-		if !ok {
-			return fmt.Errorf("nic: filename %v[%T] must be string type", filenameI, filenameI)
-		}
+			h := make(textproto.MIMEHeader)
+			h.Set("Content-Disposition",
+				fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+					escapeQuotes(name), escapeQuotes(value.FileName)))
+			h.Set("Content-Type", mimetype)
 
-		if len(fileInfo) < 1 || filename == "" {
+			part, err := writer.CreatePart(h)
+			if err != nil {
+				return err
+			}
+
+			if len(value.Src) != 0 {
+				_, err = part.Write(value.Src)
+				if err != nil {
+					return err
+				}
+			} else {
+				fp, err := os.Open(value.FilePath)
+				if err != nil {
+					return err
+				}
+				defer fp.Close()
+
+				_, err = io.Copy(part, fp)
+				if err != nil {
+					return err
+				}
+			}
+
+		case string:
+			err := writer.WriteField(name, value)
+			if err != nil {
+				return err
+			}
+
+		default:
 			return ErrFileInfo
 		}
-
-		fp, err := os.Open(filename)
-		if err != nil {
-			return err
-		}
-		defer fp.Close()
-
-		part, err := writer.CreateFormFile(name, filepath.Base(filename))
-		if err != nil {
-			return err
-		}
-
-		_, err = io.Copy(part, fp)
-		if err != nil {
-			return err
-		}
-
-		if len(fileInfo) > 1 {
-			delete(fileInfo, "filename")
-			for k, v := range fileInfo {
-				vs, ok := v.(string)
-				if !ok {
-					return fmt.Errorf("nic: %v[%T] param must be string type", v, v)
-				}
-				_ = writer.WriteField(k, vs)
-			}
-		}
 	}
+
 	err := writer.Close()
 	if err != nil {
 		return err
@@ -194,7 +271,9 @@ func (h H) setRequestOpt(req *http.Request) error {
 		for headerK, headerV := range h.Headers {
 			headerVS, ok := headerV.(string)
 			if !ok {
-				return fmt.Errorf("nic: header %v[%T] must be string type", headerV, headerV)
+				return fmt.Errorf(
+					"nic: header %v[%T] must be string type",
+					headerV, headerV)
 			}
 			req.Header.Add(headerK, headerVS)
 		}
@@ -205,7 +284,9 @@ func (h H) setRequestOpt(req *http.Request) error {
 		for cookieK, cookieV := range h.Cookies {
 			cookieVS, ok := cookieV.(string)
 			if !ok {
-				return fmt.Errorf("nic: cookie %v[%T] must be string type", cookieV, cookieV)
+				return fmt.Errorf(
+					"nic: cookie %v[%T] must be string type",
+					cookieV, cookieV)
 			}
 			c := &http.Cookie{
 				Name:  cookieK,
@@ -219,7 +300,9 @@ func (h H) setRequestOpt(req *http.Request) error {
 		for k, v := range h.Auth {
 			vs, ok := v.(string)
 			if !ok {
-				return fmt.Errorf("nic: basic-auth %v[%T] must be string type", v, v)
+				return fmt.Errorf(
+					"nic: basic-auth %v[%T] must be string type",
+					v, v)
 			}
 			req.SetBasicAuth(k, vs)
 		}

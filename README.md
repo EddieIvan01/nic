@@ -8,16 +8,15 @@ Nic is a HTTP request client which has elegant, easy-to-use API
 
 ***
 
-### Features
+## Features
 
 + wrapper of HTTP std lib, provids elegant and easy-to-use API
 
 + keep session via `nic.Session` structure
-+ thread(go-routine) safe
 
 ***
 
-### Installation
+## Installation
 
 To install nic, enter the following command
 
@@ -27,7 +26,7 @@ $ go get -v -u github.com/eddieivan01/nic
 
 ***
 
-### Quick start
+## Quick start
 
 Do a HTTP request like this
 
@@ -41,9 +40,9 @@ fmt.Println(resp.Text)
 
 ***
 
-### Documentation
+## Documentation
 
-#### do a basic request
+### do a basic request
 
 nic could do these methods' request
 
@@ -65,7 +64,7 @@ func main() {
 }
 ```
 
-#### post request with some data
+### post request with some data
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -78,7 +77,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-#### request with cookies
+### request with cookies
 
 ```go
 resp, err := nic.Get(url, nic.H{
@@ -88,21 +87,22 @@ resp, err := nic.Get(url, nic.H{
 })
 ```
 
-#### request with files
+### request with files
 
 ```go
 resp, err := nic.Post(url, nic.H{
-    Files : nic.F{
-        "file" : nic.KV{
-            // path of file, filename will be `nic.go`
-            "filename" : `/home/nic/nic.go`,
-            "token" : "0xff",
-        },
+    Files : nic.KV{
+        "file1": nic.File(
+                    "nic.go", 
+                    []byte("package nic")),
+        "file2": nic.FileFromPath("./nic.go").
+                    MIME("text/plain").
+                    FName("nic"),
     },
 })
 ```
 
-#### request with JSON
+### request with JSON
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -112,7 +112,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-#### request with unencoded message
+### request with unencoded message
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -120,7 +120,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-#### all the parameters
+### all the parameters
 
 ```go
 H struct {
@@ -140,13 +140,13 @@ H struct {
 }
 ```
 
-#### NOTICE
+### NOTICE
 
 `nic.H` can only have one of the following four parameters
 
 `H.Raw, H.Data, H.Files, H.JSON`
 
-#### request with session, which could save server's`set-cookie` header
+### request with session, which could save server's`set-cookie` header
 
 ```go
 session := &nic.Session{}
@@ -162,7 +162,7 @@ resp, err := session.Post("http://example.com/login", nic.H{
 resp, err = session.Get("http://example.com/userinfo", nil)
 ```
 
-#### handle response
+### handle response
 
 ```go
 resp, _ := nic.Get(url, nil)
@@ -170,7 +170,7 @@ fmt.Println(resp.Text)
 fmt.Println(resp.Bytes)
 ```
 
-#### handle JSON response
+### handle JSON response
 
 ```go
 resp, _ := nil.Get(url, nil)
@@ -188,7 +188,7 @@ if err == nil {
 }
 ```
 
-#### change response's encoding
+### change response's encoding
 
 `SetEncode` will convert `resp.Bytes` to `resp.Text` if encoding is changed every time be called 
 
@@ -203,7 +203,7 @@ if err == nil {
 
 ***
 
-### QA
+## QA
 
 + Q:
 
