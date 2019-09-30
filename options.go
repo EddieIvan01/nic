@@ -2,6 +2,7 @@ package nic
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,13 +26,15 @@ type (
 		Cookies KV
 		Auth    KV
 		Proxy   string
+		JSON    KV
+		Files   KV
 
-		AllowRedirect bool
-		Timeout       int64
-		Chunked       bool
-
-		JSON  KV
-		Files KV
+		AllowRedirect      bool
+		Timeout            int64
+		Chunked            bool
+		DisableKeepAlives  bool
+		DisableCompression bool
+		SkipVerifyTLS      bool
 	}
 
 	// KV is used for H struct
@@ -334,15 +337,25 @@ func (h H) setClientOpt(client *http.Client) error {
 
 	client.Timeout = time.Duration(h.Timeout) * time.Second
 
+	transport := client.Transport.(*http.Transport)
+	transport.DisableKeepAlives = h.DisableKeepAlives
+	transport.DisableCompression = h.DisableCompression
+
+	if h.SkipVerifyTLS {
+		if transport.TLSClientConfig == nil {
+			transport.TLSClientConfig = &tls.Config{}
+		}
+		transport.TLSClientConfig.InsecureSkipVerify = true
+	}
+
 	if h.Proxy != "" {
 		urli := url.URL{}
 		urlproxy, err := urli.Parse(h.Proxy)
 		if err != nil {
 			return err
 		}
-		client.Transport = &http.Transport{
-			Proxy: http.ProxyURL(urlproxy),
-		}
+		transport.Proxy = http.ProxyURL(urlproxy)
 	}
+
 	return nil
 }

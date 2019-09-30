@@ -66,30 +66,37 @@ func (s *Session) Request(method string, urlStr string, option Option) (*Respons
 			s.request.AddCookie(cookie)
 		}
 
-		// set options of http.Request
-		if option != nil {
-			err = option.setRequestOpt(s.request)
-            if err != nil {
-			    return nil, err
-		    }
-		}
-
 		if s.Client == nil {
 			s.Client = &http.Client{}
+			s.Client.Transport = &http.Transport{}
 		}
 
-		// set options of http.Client
 		if option != nil {
+			// set options of http.Request
+			err = option.setRequestOpt(s.request)
+			if err != nil {
+				return nil, err
+			}
+
+			// all client config will be restored to the default value after every request
+			defer func() {
+				s.Client.CheckRedirect = defaultCheckRedirect
+				s.Client.Timeout = 0
+				s.Client.Transport = &http.Transport{}
+			}()
+
+			// set options of http.Client
 			err = option.setClientOpt(s.Client)
-            if err != nil {
-			    return nil, err
-		    }
+			if err != nil {
+				return nil, err
+			}
 		}
+
 	default:
 		return nil, ErrInvalidMethod
 	}
 
-	// do request and parse response
+	// do request then parse response
 	r, err := s.Client.Do(s.request)
 	if err != nil {
 		return nil, err
@@ -98,10 +105,6 @@ func (s *Session) Request(method string, urlStr string, option Option) (*Respons
 	if err != nil {
 		return nil, err
 	}
-
-	// allowRedirect and timeout will be restored to the default value after every request
-	s.Client.CheckRedirect = defaultCheckRedirect
-	s.Client.Timeout = 0
 
 	// store cookies in the session structure
 	s.Cookies = append(s.Cookies, resp.Cookies()...)

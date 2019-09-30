@@ -142,7 +142,7 @@ resp, _ := nic.Get(url, nic.H{
 })
 ```
 
-### all the parameters
+### all the parameters you could set
 
 ```go
 H struct {
@@ -152,13 +152,15 @@ H struct {
     Cookies KV
     Auth    KV
     Proxy   string
+    JSON    KV
+    Files   KV
 
-    AllowRedirect bool
-    Timeout       int64
-    Chunked       bool
-
-    JSON  KV
-    Files KV
+    AllowRedirect      bool
+    Timeout            int64
+    Chunked            bool
+    DisableKeepAlives  bool
+    DisableCompression bool
+    SkipVerifyTLS      bool
 }
 ```
 

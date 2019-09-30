@@ -41,18 +41,22 @@ func (r *Response) text() {
 
 func (r *Response) bytes() error {
 	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+
 	// for multiple reading
 	// e.g. goquery.NewDocumentFromReader
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(data))
 	r.Bytes = data
-	return err
+	return nil
 }
 
 // JSON could parse http json response
-// if is not a json response, returns ErrNotJsonResponse
 func (r Response) JSON(s interface{}) error {
 	// JSON response not must be `application/json` type
-	// maybe `text/plain`, `text/html`...etc.
+	// maybe `text/plain`...etc.
+	// nic will parse it regardless of the content-type
 	/*
 		cType := r.Header.Get("Content-Type")
 		if !strings.Contains(cType, "json") {
