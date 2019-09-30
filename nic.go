@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	version   = "0.2.0"
-	userAgent = "golang-nic/0.2.0"
+	version   = "0.2.1"
+	userAgent = "golang-nic/0.2.1"
 	author    = "Iv4n"
 	copyright = "Copyright 2019 Iv4n"
 )

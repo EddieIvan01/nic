@@ -46,7 +46,7 @@ fmt.Println(resp.Text)
 
 nic可以发送以下方法的请求
 
-`"HEAD", "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH", "CONNECT", "TRACE"`
+`"HEAD", "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH"`
 
 ```go
 import (
@@ -64,7 +64,9 @@ func main() {
 }
 ```
 
-### 带data的post请求
+### 携带data的post请求
+
+你会发现，所有的请求参数都是由`nic.H`结构体传递的，而内部的请求参数都是由`nic.KV`设置的，它本质是一个`map[string]interface{}`
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -77,17 +79,25 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### 带cookies的请求
+### 携带cookies的请求
+
+当然，你也可以在Headers里设置它
 
 ```go
 resp, err := nic.Get(url, nic.H{
     Cookies : nic.KV{
-        "cookie1" : "nic",
+        "cookie" : "nic",
     },
 })
 ```
 
-### 带文件的请求
+### 上传文件的请求
+
+你可以通过`[]byte` 类型的文件内容 + 文件名来上传一个文件，也可以直接通过本地文件路径上传
+
+文件类型可以自定义`multipart`表单的字段名，文件名和MIME Type
+
+为了更方便的设置文件属性，你可以通过链式调用来修改文件名和MIME Type
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -102,7 +112,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### 带JSON的请求
+### 携带JSON的请求
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -117,6 +127,18 @@ resp, err := nic.Post(url, nic.H{
 ```go
 resp, err := nic.Post(url, nic.H{
     Raw : "post body which is unencoded",
+})
+```
+
+### 使用分块传输机制
+
+默认是不会使用分块传输的
+
+启用`transfer-encoding: chunked`机制
+
+```go
+resp, _ := nic.Get(url, nic.H{
+    Chunked: true,
 })
 ```
 
@@ -136,17 +158,17 @@ H struct {
     Chunked       bool
 
     JSON  KV
-    Files F
+    Files KV
 }
 ```
 
-### 注意!!!
+### 注意
 
 `nic.H` 只能带有以下四种参数的一个
 
 `H.Raw, H.Data, H.Files, H.JSON`
 
-### 用session发起请求，session可以保存服务器的`set-cookie`选项设置的cookie
+### 用session发起请求，session可以处理服务器的`set-cookie`头设置的cookie
 
 ```go
 session := &nic.Session{}
@@ -173,7 +195,7 @@ fmt.Println(resp.Bytes)
 ### 处理JSON响应
 
 ```go
-resp, _ := nil.Get(url, nil)
+resp, _ := nic.Get(url, nil)
 
 type S struct {
     P1 string `json:"p1"`
@@ -193,12 +215,19 @@ if err == nil {
 如果编码改变了的话，`SetEncode` 函数每一次调用都会把`resp.Bytes`转换到`resp.Text`
 
 ```go
-resp, _ := nil.Get(url, nil)
+resp, _ := nic.Get(url, nil)
 err := resp.SetEncode("gbk")
 
 if err == nil {
     fmt.Println(resp.Text)
 }
+```
+
+### 将响应内容保存到文件
+
+```go
+resp, _ := nic.Get("http://example.com/1.jpg", nil)
+err := resp.SaveFile("1.jpg")
 ```
 
 ***
@@ -223,7 +252,7 @@ if err == nil {
 
 + Q:
 
-  默认只允许十次重定向，我如何增加这个次数?
+  默认只允许十次重定向，如何增加这个次数?
 
   A:
 

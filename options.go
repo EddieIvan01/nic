@@ -40,7 +40,7 @@ type (
 	// when upload a file, we use nic.KV again
 	// nic.File returns F struct
 	//
-	// map[string]interface{} {
+	// nic.KV {
 	//     "file1" :"file" : nic.FileFromPath("test.go"),
 	//     "file2" : nic.File("test.go", []byte("package nic")).
 	// 					FName("nic.go").
@@ -52,7 +52,6 @@ type (
 	// the POST body is:
 	//
 	// Content-Type: multipart/form-data; boundary=e7d105eae032bdc774a787f1d874269d04499cb284477d6d77889be73caf
-	// Accept-Encoding: gzip
 	//
 	// --e7d105eae032bdc774a787f1d874269d04499cb284477d6d77889be73caf
 	// Content-Disposition: form-data; name="file1"; filename="test.go"
@@ -69,6 +68,7 @@ type (
 	//
 	// package test
 	// --e7d105eae032bdc774a787f1d874269d04499cb284477d6d77889be73caf--
+	//
 	//
 	// F struct saves file form information
 	F struct {
@@ -245,9 +245,9 @@ func setJSON(req *http.Request, j KV, chunked bool) error {
 	return nil
 }
 
+// set option for http.Request
+// data, header, cookie, auth, file, json
 func (h H) setRequestOpt(req *http.Request) error {
-	// set option to request
-	// data, header, cookie, auth, file, json
 	if h.isConflict() {
 		return ErrParamConflict
 	}
@@ -325,6 +325,8 @@ func (h H) setRequestOpt(req *http.Request) error {
 	return nil
 }
 
+// set option for http.Client
+// proxy, timeout, redirect
 func (h H) setClientOpt(client *http.Client) error {
 	if !h.AllowRedirect {
 		client.CheckRedirect = disableRedirect

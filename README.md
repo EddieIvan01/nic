@@ -46,7 +46,7 @@ fmt.Println(resp.Text)
 
 nic could do these methods' request
 
-`"HEAD", "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH", "CONNECT", "TRACE"`
+`"HEAD", "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH"`
 
 ```go
 import (
@@ -64,7 +64,9 @@ func main() {
 }
 ```
 
-### post request with some data
+### post request with some form data
+
+as you see, all requests' parameters are passed by `nic.H`, and the inner is saved in `nic.KV`, it's actually `map[string]interface{}`
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -79,15 +81,23 @@ resp, err := nic.Post(url, nic.H{
 
 ### request with cookies
 
+of course, you can also set it in Headers
+
 ```go
 resp, err := nic.Get(url, nic.H{
     Cookies : nic.KV{
-        "cookie1" : "nic",
+        "cookie" : "nic",
     },
 })
 ```
 
 ### request with files
+
+you can upload files with files' name + files' content which is `[]byte` type, and can also upload via local file path
+
+while uploading a file, you can set `multipart` form's field name, filename and MIME type
+
+for more convenient  setting files parameters, you can invoke in a chain to set `filename` and MIME type
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -112,11 +122,23 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### request with unencoded message
+### request with unencoded raw message
 
 ```go
 resp, err := nic.Post(url, nic.H{
     Raw : "post body which is unencoded",
+})
+```
+
+### using chunked transfer
+
+The default is not to use chunked transfer
+
+enable the `transfer-encoding: chunked`
+
+```go
+resp, _ := nic.Get(url, nic.H{
+    Chunked: true,
 })
 ```
 
@@ -136,7 +158,7 @@ H struct {
     Chunked       bool
 
     JSON  KV
-    Files F
+    Files KV
 }
 ```
 
@@ -146,7 +168,7 @@ H struct {
 
 `H.Raw, H.Data, H.Files, H.JSON`
 
-### request with session, which could save server's`set-cookie` header
+### request with session, which could handle server's `set-cookie` header
 
 ```go
 session := &nic.Session{}
@@ -173,7 +195,7 @@ fmt.Println(resp.Bytes)
 ### handle JSON response
 
 ```go
-resp, _ := nil.Get(url, nil)
+resp, _ := nic.Get(url, nil)
 
 type S struct {
     P1 string `json:"p1"`
@@ -193,12 +215,19 @@ if err == nil {
 `SetEncode` will convert `resp.Bytes` to `resp.Text` if encoding is changed every time be called 
 
 ```go
-resp, _ := nil.Get(url, nil)
+resp, _ := nic.Get(url, nil)
 err := resp.SetEncode("gbk")
 
 if err == nil {
     fmt.Println(resp.Text)
 }
+```
+
+### save response's content as a file
+
+```go
+resp, _ := nic.Get("http://example.com/1.jpg", nil)
+err := resp.SaveFile("1.jpg")
 ```
 
 ***
