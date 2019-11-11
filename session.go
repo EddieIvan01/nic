@@ -3,8 +3,10 @@ package nic
 import (
 	"errors"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
+	"sync"
 )
 
 type (
@@ -12,12 +14,7 @@ type (
 	Session struct {
 		Client  *http.Client
 		request *http.Request
-		Cookies []*http.Cookie
-
-		// default to true
-		allowRedirect bool
-		// default to 0
-		timeout int64
+		sync.Mutex
 	}
 )
 
@@ -44,8 +41,10 @@ func NewSession() *Session {
 
 // Request is the base method
 func (s *Session) Request(method string, urlStr string, option Option) (*Response, error) {
-	method = strings.ToUpper(method)
+	s.Lock()
+	defer s.Unlock()
 
+	method = strings.ToUpper(method)
 	switch method {
 	case "HEAD", "GET", "POST", "DELETE", "OPTIONS", "PUT", "PATCH":
 		// urlencode the query string
@@ -62,12 +61,10 @@ func (s *Session) Request(method string, urlStr string, option Option) (*Respons
 		s.request.Header.Set("User-Agent", userAgent)
 		s.request.Close = true
 
-		for _, cookie := range s.Cookies {
-			s.request.AddCookie(cookie)
-		}
-
 		if s.Client == nil {
 			s.Client = &http.Client{}
+			jar, _ := cookiejar.New(nil)
+			s.Client.Jar = jar
 			s.Client.Transport = &http.Transport{}
 		}
 
@@ -106,14 +103,7 @@ func (s *Session) Request(method string, urlStr string, option Option) (*Respons
 		return nil, err
 	}
 
-	// store cookies in the session structure
-	s.Cookies = append(s.Cookies, resp.Cookies()...)
 	return resp, nil
-}
-
-// ClearCookies deletes all cookies
-func (s *Session) ClearCookies() {
-	s.Cookies = []*http.Cookie{}
 }
 
 // GetRequest returns nic.Session.request

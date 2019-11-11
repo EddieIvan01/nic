@@ -1,3 +1,9 @@
+## Nic 0.3
+
++ fix issues #5 #6
++ add enhancement issue #2: add option params 
++ change:  `nic.Session` is go-routine safe now
+
 ## Nic 0.2.1
 
 + add file handling method: nic.Response.SaveFile

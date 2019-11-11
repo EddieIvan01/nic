@@ -20,6 +20,7 @@ import (
 type (
 	// H struct is options for request and http client
 	H struct {
+		Params  KV
 		Data    KV
 		Raw     string
 		Headers KV
@@ -142,6 +143,33 @@ func (h H) isConflict() bool {
 	return count > 1
 }
 
+func setQuery(req *http.Request, p KV) error {
+	originURL := req.URL
+	extendQuery := make([]byte, 0)
+
+	for k, v := range p {
+		kEscaped := url.QueryEscape(k)
+		vs, ok := v.(string)
+		if !ok {
+			return fmt.Errorf("nic: query param %v[%T] must be string type", v, v)
+		}
+		vEscaped := url.QueryEscape(vs)
+
+		extendQuery = append(extendQuery, '&')
+		extendQuery = append(extendQuery, []byte(kEscaped)...)
+		extendQuery = append(extendQuery, '=')
+		extendQuery = append(extendQuery, []byte(vEscaped)...)
+	}
+
+	// trim the `&`
+	if originURL.RawQuery == "" {
+		extendQuery = extendQuery[1:]
+	}
+
+	originURL.RawQuery += string(extendQuery)
+	return nil
+}
+
 func setData(req *http.Request, d KV, chunked bool) error {
 	data := ""
 	for k, v := range d {
@@ -255,6 +283,13 @@ func (h H) setRequestOpt(req *http.Request) error {
 		return ErrParamConflict
 	}
 
+	if h.Params != nil {
+		err := setQuery(req, h.Params)
+		if err != nil {
+			return err
+		}
+	}
+
 	if h.Data != nil {
 		err := setData(req, h.Data, h.Chunked)
 		if err != nil {
@@ -278,12 +313,11 @@ func (h H) setRequestOpt(req *http.Request) error {
 					"nic: header %v[%T] must be string type",
 					headerV, headerV)
 			}
-			req.Header.Add(headerK, headerVS)
+			req.Header.Set(headerK, headerVS)
 		}
 	}
 
 	if h.Cookies != nil {
-		req.Header.Set("Cookies", "")
 		for cookieK, cookieV := range h.Cookies {
 			cookieVS, ok := cookieV.(string)
 			if !ok {

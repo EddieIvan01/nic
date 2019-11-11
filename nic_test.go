@@ -18,7 +18,7 @@ func init() {
 	router := gin.Default()
 
 	router.GET("/get", func(c *gin.Context) {
-		c.String(200, "ok"+c.ClientIP()+c.GetHeader("Cookie"))
+		c.String(200, "ok"+c.ClientIP()+c.GetHeader("Cookie")+c.Query("nic"))
 	})
 	router.GET("/redirect", func(c *gin.Context) {
 		c.Redirect(302, "/redirect-dst")
@@ -115,15 +115,20 @@ func TestGetMethodWithNoParams(t *testing.T) {
 func TestGetMethodWithParams(t *testing.T) {
 	session := &Session{}
 
-	resp, err := session.Request("get", baseURL+"/get", &H{
+	resp, err := session.Request("get", baseURL+"/get?b=1", &H{
 		Headers: KV{
 			"X-Forwarded-For": "1.1.1.1",
+		},
+		Params: KV{
+			"nic": "test-params",
 		},
 		Cookies: KV{
 			"nic": "nic",
 		},
 	})
-	if err != nil || !strings.Contains(resp.Text, "1.1.1.1") || !strings.Contains(resp.Text, "nic") {
+	t.Log(session.GetRequest().URL)
+	if err != nil || !strings.Contains(resp.Text, "1.1.1.1") ||
+		!strings.Contains(resp.Text, "nic") || !strings.Contains(resp.Text, "test-params") {
 		t.Error("get method with params error")
 	} else {
 		t.Log("get method with params ok ✔")
@@ -158,20 +163,6 @@ func TestTimeout(t *testing.T) {
 	} else {
 		t.Error("timeout error")
 	}
-}
-func TestSessionKeeping(t *testing.T) {
-	session := &Session{}
-
-	resp, _ := session.Request("get", baseURL+"/cookie", nil)
-	cookies := session.Cookies
-	if len(cookies) == 0 || len(resp.Cookies()) == 0 {
-		t.Error("session keep error")
-	}
-	respT, _ := session.Request("get", baseURL+"/session", nil)
-	if respT.Text != "session_keep_ok" {
-		t.Error("session keep error")
-	}
-	t.Log("session keep ok ✔")
 }
 
 func TestPostMethodWithData(t *testing.T) {

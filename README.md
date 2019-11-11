@@ -12,7 +12,7 @@ Nic is a HTTP request client which has elegant, easy-to-use API
 
 + wrapper of HTTP std lib, provids elegant and easy-to-use API
 
-+ keep session via `nic.Session` structure
++ keep session via `nic.Session` structure, `nic.Session` is go-routine safe
 
 ***
 
@@ -142,10 +142,21 @@ resp, _ := nic.Get(url, nic.H{
 })
 ```
 
+### set query params
+
+```go
+resp, err := nic.Get(url, nic.H {
+    Params: nic.KV {
+        "a": "1",
+    },
+})
+```
+
 ### all the parameters you could set
 
 ```go
 H struct {
+    Params  KV
     Data    KV
     Raw     string
     Headers KV

@@ -12,7 +12,7 @@ Nic是一个拥有优雅易用的API的HTTP请求库
 
 + 封装了HTTP标准库，提供了优雅易用的API
 
-+ 通过`nic.Session`来保持session
++ 通过`nic.Session`来保持session，`nic.Session`是go-routine安全的
 
 ***
 
@@ -142,10 +142,21 @@ resp, _ := nic.Get(url, nic.H{
 })
 ```
 
+### 设置URL查询参数
+
+```go
+resp, err := nic.Get(url, nic.H {
+    Params: nic.KV {
+        "a": "1",
+    },
+})
+```
+
 ### 所有可设置的请求参数
 
 ```go
 H struct {
+    Params  KV
     Data    KV
     Raw     string
     Headers KV
