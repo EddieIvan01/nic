@@ -42,7 +42,7 @@ fmt.Println(resp.Text)
 
 ## 文档
 
-### 发起一个基本的请求
+## 发起一个基本的请求
 
 nic可以发送以下方法的请求
 
@@ -64,7 +64,7 @@ func main() {
 }
 ```
 
-### 携带data的post请求
+## 携带data的post请求
 
 你会发现，所有的请求参数都是由`nic.H`结构体传递的，而内部的请求参数都是由`nic.KV`设置的，它本质是一个`map[string]interface{}`
 
@@ -79,7 +79,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### 携带cookies的请求
+## 携带cookies的请求
 
 当然，你也可以在Headers里设置它
 
@@ -91,7 +91,7 @@ resp, err := nic.Get(url, nic.H{
 })
 ```
 
-### 上传文件的请求
+## 上传文件的请求
 
 你可以通过`[]byte` 类型的文件内容 + 文件名来上传一个文件，也可以直接通过本地文件路径上传
 
@@ -112,7 +112,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### 携带JSON的请求
+## 携带JSON的请求
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -122,7 +122,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### 发送未经编码的原生数据
+## 发送未经编码的原生数据
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -130,7 +130,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### 使用分块传输机制
+## 使用分块传输机制
 
 默认是不会使用分块传输的
 
@@ -142,7 +142,7 @@ resp, _ := nic.Get(url, nic.H{
 })
 ```
 
-### 设置URL查询参数
+## 设置URL查询参数
 
 ```go
 resp, err := nic.Get(url, nic.H {
@@ -152,7 +152,7 @@ resp, err := nic.Get(url, nic.H {
 })
 ```
 
-### 所有可设置的请求参数
+## 所有可设置的请求参数
 
 ```go
 H struct {
@@ -175,16 +175,16 @@ H struct {
 }
 ```
 
-### 注意
+## 注意
 
 `nic.H` 只能带有以下四种参数的一个
 
 `H.Raw, H.Data, H.Files, H.JSON`
 
-### 用session发起请求，session可以处理服务器的`set-cookie`头设置的cookie
+## 用session发起请求，session可以处理服务器的`set-cookie`头设置的cookie
 
 ```go
-session := &nic.Session{}
+session := nic.NewSession()
 resp, err := session.Post("http://example.com/login", nic.H{
     Data : nic.KV{
         "uname" : "nic",
@@ -197,7 +197,7 @@ resp, err := session.Post("http://example.com/login", nic.H{
 resp, err = session.Get("http://example.com/userinfo", nil)
 ```
 
-### 处理响应
+## 处理响应
 
 ```go
 resp, _ := nic.Get(url, nil)
@@ -205,7 +205,7 @@ fmt.Println(resp.Text)
 fmt.Println(resp.Bytes)
 ```
 
-### 处理JSON响应
+## 处理JSON响应
 
 ```go
 resp, _ := nic.Get(url, nil)
@@ -223,7 +223,7 @@ if err == nil {
 }
 ```
 
-### 改变响应的编码
+## 改变响应的编码
 
 如果编码改变了的话，`SetEncode` 函数每一次调用都会把`resp.Bytes`转换到`resp.Text`
 
@@ -236,11 +236,29 @@ if err == nil {
 }
 ```
 
-### 将响应内容保存到文件
+## 将响应内容保存到文件
 
 ```go
 resp, _ := nic.Get("http://example.com/1.jpg", nil)
 err := resp.SaveFile("1.jpg")
+```
+
+***
+
+## 注册一个请求或响应的钩子函数
+
+```go
+session := nic.NewSession()
+session.RegisterBeforeReqHook(func(r *http.Request) error {
+    r.URL.RawQuery = "nic=nic"
+    return nil
+})
+session.RegisterAfterRespHook(func(r *http.Response) error {
+    r.Header.Set("nic", "nic")
+    return nil
+})
+
+session.Get(url, nil)
 ```
 
 ***

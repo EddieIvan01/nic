@@ -42,7 +42,7 @@ fmt.Println(resp.Text)
 
 ## Documentation
 
-### do a basic request
+## do a basic request
 
 nic could do these methods' request
 
@@ -64,7 +64,7 @@ func main() {
 }
 ```
 
-### post request with some form data
+## post request with some form data
 
 as you see, all requests' parameters are passed by `nic.H`, and the inner is saved in `nic.KV`, it's actually `map[string]interface{}`
 
@@ -79,7 +79,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### request with cookies
+## request with cookies
 
 of course, you can also set it in Headers
 
@@ -91,7 +91,7 @@ resp, err := nic.Get(url, nic.H{
 })
 ```
 
-### request with files
+## request with files
 
 you can upload files with files' name + files' content which is `[]byte` type, and can also upload via local file path
 
@@ -112,7 +112,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### request with JSON
+## request with JSON
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -122,7 +122,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### request with unencoded raw message
+## request with unencoded raw message
 
 ```go
 resp, err := nic.Post(url, nic.H{
@@ -130,7 +130,7 @@ resp, err := nic.Post(url, nic.H{
 })
 ```
 
-### using chunked transfer
+## using chunked transfer
 
 The default is not to use chunked transfer
 
@@ -142,7 +142,7 @@ resp, _ := nic.Get(url, nic.H{
 })
 ```
 
-### set query params
+## set query params
 
 ```go
 resp, err := nic.Get(url, nic.H {
@@ -152,7 +152,7 @@ resp, err := nic.Get(url, nic.H {
 })
 ```
 
-### all the parameters you could set
+## all the parameters you could set
 
 ```go
 H struct {
@@ -175,16 +175,16 @@ H struct {
 }
 ```
 
-### NOTICE
+## NOTICE
 
 `nic.H` can only have one of the following four parameters
 
 `H.Raw, H.Data, H.Files, H.JSON`
 
-### request with session, which could handle server's `set-cookie` header
+## request with session, which could handle server's `set-cookie` header
 
 ```go
-session := &nic.Session{}
+session := nic.NewSession()
 resp, err := session.Post("http://example.com/login", nic.H{
     Data : nic.KV{
         "uname" : "nic",
@@ -197,7 +197,7 @@ resp, err := session.Post("http://example.com/login", nic.H{
 resp, err = session.Get("http://example.com/userinfo", nil)
 ```
 
-### handle response
+## handle response
 
 ```go
 resp, _ := nic.Get(url, nil)
@@ -205,7 +205,7 @@ fmt.Println(resp.Text)
 fmt.Println(resp.Bytes)
 ```
 
-### handle JSON response
+## handle JSON response
 
 ```go
 resp, _ := nic.Get(url, nil)
@@ -223,7 +223,7 @@ if err == nil {
 }
 ```
 
-### change response's encoding
+## change response's encoding
 
 `SetEncode` will convert `resp.Bytes` to `resp.Text` if encoding is changed every time be called 
 
@@ -236,11 +236,29 @@ if err == nil {
 }
 ```
 
-### save response's content as a file
+## save response's content as a file
 
 ```go
 resp, _ := nic.Get("http://example.com/1.jpg", nil)
 err := resp.SaveFile("1.jpg")
+```
+
+***
+
+## register a request/response hook
+
+```go
+session := nic.NewSession()
+session.RegisterBeforeReqHook(func(r *http.Request) error {
+    r.URL.RawQuery = "nic=nic"
+    return nil
+})
+session.RegisterAfterRespHook(func(r *http.Response) error {
+    r.Header.Set("nic", "nic")
+    return nil
+})
+
+session.Get(url, nil)
 ```
 
 ***

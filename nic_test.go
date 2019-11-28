@@ -1,108 +1,411 @@
 package nic
 
 import (
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
+	"net"
+	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/armon/go-socks5"
-	"github.com/gin-gonic/gin"
 )
 
 // Testing http server addr
 var baseURL = "http://127.0.0.1:2333"
 
-func init() {
-	gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
+var (
+	Commands = []string{"CONNECT", "BIND", "UDP ASSOCIATE"}
+	AddrType = []string{"", "IPv4", "", "Domain", "IPv6"}
+	Conns    = make([]net.Conn, 0)
+	Verbose  = false
 
-	router.GET("/get", func(c *gin.Context) {
-		c.String(200, "ok"+c.ClientIP()+c.GetHeader("Cookie")+c.Query("nic"))
+	errAddrType      = errors.New("socks addr type not supported")
+	errVer           = errors.New("socks version not supported")
+	errMethod        = errors.New("socks only support noauth method")
+	errAuthExtraData = errors.New("socks authentication get extra data")
+	errReqExtraData  = errors.New("socks request get extra data")
+	errCmd           = errors.New("socks only support connect command")
+)
+
+const (
+	socksVer5       = 0x05
+	socksCmdConnect = 0x01
+)
+
+func netCopy(input, output net.Conn) (err error) {
+	buf := make([]byte, 8192)
+	for {
+		count, err := input.Read(buf)
+		if err != nil {
+			if err == io.EOF && count > 0 {
+				output.Write(buf[:count])
+			}
+			break
+		}
+		if count > 0 {
+			output.Write(buf[:count])
+		}
+	}
+	return
+}
+
+func handShake(conn net.Conn) (err error) {
+	const (
+		idVer     = 0
+		idNmethod = 1
+	)
+
+	buf := make([]byte, 258)
+
+	var n int
+
+	// make sure we get the nmethod field
+	if n, err = io.ReadAtLeast(conn, buf, idNmethod+1); err != nil {
+		return
+	}
+
+	if buf[idVer] != socksVer5 {
+		return errVer
+	}
+
+	nmethod := int(buf[idNmethod]) //  client support auth mode
+	msgLen := nmethod + 2          //  auth msg length
+	if n == msgLen {               // handshake done, common case
+		// do nothing, jump directly to send confirmation
+	} else if n < msgLen { // has more methods to read, rare case
+		if _, err = io.ReadFull(conn, buf[n:msgLen]); err != nil {
+			return
+		}
+	} else { // error, should not get extra data
+		return errAuthExtraData
+	}
+	/*
+	   X'00' NO AUTHENTICATION REQUIRED
+	   X'01' GSSAPI
+	   X'02' USERNAME/PASSWORD
+	   X'03' to X'7F' IANA ASSIGNED
+	   X'80' to X'FE' RESERVED FOR PRIVATE METHODS
+	   X'FF' NO ACCEPTABLE METHODS
+	*/
+	// send confirmation: version 5, no authentication required
+	_, err = conn.Write([]byte{socksVer5, 0})
+	return
+}
+
+func parseTarget(conn net.Conn) (host string, err error) {
+	const (
+		idVer   = 0
+		idCmd   = 1
+		idType  = 3 // address type index
+		idIP0   = 4 // ip addres start index
+		idDmLen = 4 // domain address length index
+		idDm0   = 5 // domain address start index
+
+		typeIPv4 = 1 // type is ipv4 address
+		typeDm   = 3 // type is domain address
+		typeIPv6 = 4 // type is ipv6 address
+
+		lenIPv4   = 3 + 1 + net.IPv4len + 2 // 3(ver+cmd+rsv) + 1addrType + ipv4 + 2port
+		lenIPv6   = 3 + 1 + net.IPv6len + 2 // 3(ver+cmd+rsv) + 1addrType + ipv6 + 2port
+		lenDmBase = 3 + 1 + 1 + 2           // 3 + 1addrType + 1addrLen + 2port, plus addrLen
+	)
+	// refer to getRequest in server.go for why set buffer size to 263
+	buf := make([]byte, 263)
+	var n int
+
+	// read till we get possible domain length field
+	if n, err = io.ReadAtLeast(conn, buf, idDmLen+1); err != nil {
+		return
+	}
+
+	// check version and cmd
+	if buf[idVer] != socksVer5 {
+		err = errVer
+		return
+	}
+
+	if buf[idCmd] != socksCmdConnect { //  only support CONNECT mode
+		err = errCmd
+		return
+	}
+
+	// read target address
+	reqLen := -1
+	switch buf[idType] {
+	case typeIPv4:
+		reqLen = lenIPv4
+	case typeIPv6:
+		reqLen = lenIPv6
+	case typeDm: // domain name
+		reqLen = int(buf[idDmLen]) + lenDmBase
+	default:
+		err = errAddrType
+		return
+	}
+
+	if n == reqLen {
+		// common case, do nothing
+	} else if n < reqLen { // rare case
+		if _, err = io.ReadFull(conn, buf[n:reqLen]); err != nil {
+			return
+		}
+	} else {
+		err = errReqExtraData
+		return
+	}
+
+	switch buf[idType] {
+	case typeIPv4:
+		host = net.IP(buf[idIP0 : idIP0+net.IPv4len]).String()
+	case typeIPv6:
+		host = net.IP(buf[idIP0 : idIP0+net.IPv6len]).String()
+	case typeDm:
+		host = string(buf[idDm0 : idDm0+buf[idDmLen]])
+	}
+	port := binary.BigEndian.Uint16(buf[reqLen-2 : reqLen])
+	host = net.JoinHostPort(host, strconv.Itoa(int(port)))
+
+	return
+}
+
+func pipeWhenClose(conn net.Conn, target string) {
+
+	if Verbose {
+		log.Println("Connect remote ", target, "...")
+	}
+
+	remoteConn, err := net.DialTimeout("tcp", target, time.Duration(time.Second*15))
+	if err != nil {
+		log.Println("Connect remote :", err)
+		return
+	}
+
+	tcpAddr := remoteConn.LocalAddr().(*net.TCPAddr)
+	if tcpAddr.Zone == "" {
+		if tcpAddr.IP.Equal(tcpAddr.IP.To4()) {
+			tcpAddr.Zone = "ip4"
+		} else {
+			tcpAddr.Zone = "ip6"
+		}
+	}
+
+	if Verbose {
+		log.Println("Connect remote success @", tcpAddr.String())
+	}
+
+	rep := make([]byte, 256)
+	rep[0] = 0x05
+	rep[1] = 0x00 // success
+	rep[2] = 0x00 //RSV
+
+	//IP
+	if tcpAddr.Zone == "ip6" {
+		rep[3] = 0x04 //IPv6
+	} else {
+		rep[3] = 0x01 //IPv4
+	}
+
+	var ip net.IP
+	if "ip6" == tcpAddr.Zone {
+		ip = tcpAddr.IP.To16()
+	} else {
+		ip = tcpAddr.IP.To4()
+	}
+	pindex := 4
+	for _, b := range ip {
+		rep[pindex] = b
+		pindex += 1
+	}
+	rep[pindex] = byte((tcpAddr.Port >> 8) & 0xff)
+	rep[pindex+1] = byte(tcpAddr.Port & 0xff)
+	conn.Write(rep[0 : pindex+2])
+	// Transfer data
+
+	defer remoteConn.Close()
+
+	// Copy local to remote
+	go netCopy(conn, remoteConn)
+
+	// Copy remote to local
+	netCopy(remoteConn, conn)
+}
+
+func handleConnection(conn net.Conn) {
+	Conns = append(Conns, conn)
+	defer func() {
+		for i, c := range Conns {
+			if c == conn {
+				Conns = append(Conns[:i], Conns[i+1:]...)
+			}
+		}
+		conn.Close()
+	}()
+	if err := handShake(conn); err != nil {
+		log.Println("socks handshake:", err)
+		return
+	}
+	addr, err := parseTarget(conn)
+	if err != nil {
+		log.Println("socks consult transfer mode or parse target :", err)
+		return
+	}
+	pipeWhenClose(conn, addr)
+}
+
+func socks5start() {
+	ln, err := net.Listen("tcp", ":8088")
+	if err != nil {
+		panic(err)
+		return
+	}
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		go handleConnection(conn)
+	}
+}
+
+func init() {
+	http.HandleFunc("/get", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		fmt.Fprintf(w, "ok"+r.Header.Get("X-Forwarded-For")+
+			r.Header.Get("Cookie")+r.Form.Get("nic"))
 	})
-	router.GET("/redirect", func(c *gin.Context) {
-		c.Redirect(302, "/redirect-dst")
+
+	http.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/redirect-dst", 302)
 	})
-	router.GET("/redirect-dst", func(c *gin.Context) {
-		c.String(200, "redirect_ok")
+
+	http.HandleFunc("/redirect-dst", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "redirect_ok")
 	})
-	router.GET("/timeout", func(c *gin.Context) {
+
+	http.HandleFunc("/timeout", func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(time.Duration(3) * time.Second)
-		c.String(200, "timeout")
+		fmt.Fprintf(w, "timeout")
 	})
-	router.GET("/cookie", func(c *gin.Context) {
-		c.SetCookie("nic", "nic", 0, "/session", "127.0.0.1", true, true)
-	})
-	router.GET("/session", func(c *gin.Context) {
-		cookie, _ := c.Cookie("nic")
-		if cookie == "nic" {
-			c.String(200, "session_keep_ok")
+
+	http.HandleFunc("/auth", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		ok := func(w http.ResponseWriter, r *http.Request) bool {
+			s := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
+			if len(s) != 2 {
+				return false
+			}
+
+			b, err := base64.StdEncoding.DecodeString(s[1])
+			if err != nil {
+				return false
+			}
+
+			pair := strings.SplitN(string(b), ":", 2)
+			if len(pair) != 2 {
+				return false
+			}
+
+			return pair[0] == "nic" && pair[1] == "nic"
+		}(w, r)
+
+		if ok {
+			fmt.Fprintf(w, "auth ok")
+		} else {
+			w.WriteHeader(401)
+			fmt.Fprintf(w, "err")
 		}
 	})
-	authorized := router.Group("/auth", gin.BasicAuth(gin.Accounts{
-		"nic": "nic"}))
-	authorized.GET("/", func(c *gin.Context) {
-		c.String(200, "auth ok")
+
+	http.HandleFunc("/cookie", func(w http.ResponseWriter, r *http.Request) {
+		c := &http.Cookie{
+			Name:  "nic",
+			Value: "nic",
+		}
+		http.SetCookie(w, c)
 	})
-	router.GET("/json-resp", func(c *gin.Context) {
+
+	http.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+		c, _ := r.Cookie("nic")
+		if c.Value == "nic" {
+			fmt.Fprintf(w, "session_keep_ok")
+		}
+	})
+
+	http.HandleFunc("/json-resp", func(w http.ResponseWriter, r *http.Request) {
 		type jsonStruct struct {
 			P1 string `json:"p1"`
 			P2 string `json:"p2"`
 		}
 		j := &jsonStruct{"1", "2"}
-		c.JSON(200, j)
-	})
-	router.GET("/encode", func(c *gin.Context) {
-		c.String(200, "你好")
+		jsonData, _ := json.Marshal(j)
+		fmt.Fprintf(w, string(jsonData))
 	})
 
-	router.POST("/data", func(c *gin.Context) {
-		args1 := c.PostForm("args1")
-		args2 := c.PostForm("args2")
+	http.HandleFunc("/encode", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "你好")
+	})
+
+	http.HandleFunc("/data", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		args1 := r.PostForm.Get("args1")
+		args2 := r.PostForm.Get("args2")
 		if args1 == "1" && args2 == "a&%%$$" {
-			c.String(200, "post data ok")
+			fmt.Fprintf(w, "post data ok")
 		} else {
-			c.String(200, "post data error")
+			fmt.Fprintf(w, "post data error")
 		}
 	})
-	router.POST("/file", func(c *gin.Context) {
-		file, _ := c.FormFile("file1")
-		file2, _ := c.FormFile("file2")
-		if file.Filename == "nic.go" && file2.Filename == "nic" {
-			c.String(200, "file upload ok")
+
+	http.HandleFunc("/file", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		_, fHeader, _ := r.FormFile("file1")
+		_, fHeader2, _ := r.FormFile("file2")
+		if fHeader.Filename == "nic.go" && fHeader2.Filename == "nic" {
+			fmt.Fprintf(w, "file upload ok")
 		} else {
-			c.String(200, "file upload error")
+			fmt.Fprintf(w, "file upload error")
 		}
 	})
-	router.POST("/json", func(c *gin.Context) {
+
+	http.HandleFunc("/json", func(w http.ResponseWriter, r *http.Request) {
 		type jsonStruct struct {
 			P1 string `json:"p1"`
 			P2 string `json:"p2"`
 		}
 		j := &jsonStruct{}
-		c.BindJSON(j)
+		if r.Header.Get("Content-Type") != "application/json" {
+			fmt.Fprintf(w, "json err")
+			return
+		}
+
+		row, _ := ioutil.ReadAll(r.Body)
+		json.Unmarshal(row, j)
 		if j.P1 == "11" && j.P2 == "s)(*&\"^%" {
-			c.String(200, "json ok")
+			fmt.Fprintf(w, "json ok")
 		} else {
-			c.String(200, "json error")
+			fmt.Fprintf(w, "json error")
 		}
 	})
 
 	// run a socks5 server
 	// for proxy option testing
-	conf := &socks5.Config{}
-	server, err := socks5.New(conf)
-	if err != nil {
-		log.Println(err.Error())
-	}
-	go server.ListenAndServe("tcp", "127.0.0.1:8088")
-
-	go router.Run("127.0.0.1:2333")
+	go socks5start()
+	go http.ListenAndServe(":2333", nil)
 }
 
 // tesing via burpsuite proxy
 func TestGetMethodWithNoParams(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
 	resp, err := session.Request("get", baseURL+"/get", nil)
 	if err != nil || resp.StatusCode != 200 {
@@ -113,7 +416,7 @@ func TestGetMethodWithNoParams(t *testing.T) {
 }
 
 func TestGetMethodWithParams(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
 	resp, err := session.Request("get", baseURL+"/get?b=1", &H{
 		Headers: KV{
@@ -126,7 +429,6 @@ func TestGetMethodWithParams(t *testing.T) {
 			"nic": "nic",
 		},
 	})
-	t.Log(session.GetRequest().URL)
 	if err != nil || !strings.Contains(resp.Text, "1.1.1.1") ||
 		!strings.Contains(resp.Text, "nic") || !strings.Contains(resp.Text, "test-params") {
 		t.Error("get method with params error")
@@ -136,7 +438,7 @@ func TestGetMethodWithParams(t *testing.T) {
 }
 
 func TestRedirect(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
 	// modify status code by proxy
 	resp1, err := session.Request("get", baseURL+"/redirect", &H{
@@ -153,7 +455,7 @@ func TestRedirect(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
 	_, err := session.Request("get", baseURL+"/timeout", &H{
 		Timeout: 1,
@@ -166,7 +468,7 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestPostMethodWithData(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
 	resp, err := session.Request("post", baseURL+"/data", &H{
 		Data: KV{
@@ -182,7 +484,7 @@ func TestPostMethodWithData(t *testing.T) {
 }
 
 func TestPostMethodWithFiles(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
 	resp, err := session.Request("post", baseURL+"/file", &H{
 		Files: KV{
@@ -199,7 +501,7 @@ func TestPostMethodWithFiles(t *testing.T) {
 }
 
 func TestPostMethodWithJson(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
 	resp, err := session.Request("post", baseURL+"/json", &H{
 		JSON: KV{
@@ -215,9 +517,9 @@ func TestPostMethodWithJson(t *testing.T) {
 }
 
 func TestAuth(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
-	resp, err := session.Request("get", baseURL+"/auth/", &H{
+	resp, err := session.Request("get", baseURL+"/auth", &H{
 		Auth: KV{
 			"nic": "nic",
 		},
@@ -230,7 +532,7 @@ func TestAuth(t *testing.T) {
 }
 
 func TestProxy(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
 	resp, err := session.Request("get", baseURL+"/get", &H{
 		Proxy: "socks5://127.0.0.1:8088",
@@ -244,7 +546,7 @@ func TestProxy(t *testing.T) {
 }
 
 func TestJsonParse(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
 	resp, err := session.Request("get", baseURL+"/json-resp", nil)
 
@@ -262,7 +564,7 @@ func TestJsonParse(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
-	session := &Session{}
+	session := NewSession()
 
 	resp, err := session.Request("get", baseURL+"/encode", nil)
 	err = resp.SetEncode("gbk")
@@ -271,4 +573,28 @@ func TestEncode(t *testing.T) {
 	} else {
 		t.Log("encode ok ✔")
 	}
+}
+
+func TestHookFuncs(t *testing.T) {
+	session := NewSession()
+
+	session.RegisterBeforeReqHook(func(r *http.Request) error {
+		r.URL.RawQuery = "nic=111"
+		return nil
+	})
+	session.RegisterAfterRespHook(func(r *http.Response) error {
+		r.Header.Set("hook", "ok")
+		return nil
+	})
+	resp, _ := session.Get(baseURL+"/get", nil)
+	if strings.Contains(resp.Text, "111") && resp.Header.Get("hook") == "ok" {
+		session.UnregisterBeforeReqHook(0)
+		session.ResetAfterRespHook()
+		resp, _ = session.Get(baseURL+"/get", nil)
+		if !strings.Contains(resp.Text, "111") && resp.Header.Get("hook") != "ok" {
+			t.Log("hook function ok ✔")
+			return
+		}
+	}
+	t.Error("hook function error")
 }
